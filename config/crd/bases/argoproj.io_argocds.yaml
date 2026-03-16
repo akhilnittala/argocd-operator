@@ -1868,8 +1868,6 @@ spec:
                     description: Enabled defines whether workload status monitoring
                       is enabled for this instance or not
                     type: boolean
-                required:
-                - enabled
                 type: object
               namespaceManagement:
                 description: NamespaceManagement defines the list of namespaces that
@@ -17994,8 +17992,6 @@ spec:
                     description: Enabled defines whether workload status monitoring
                       is enabled for this instance or not
                     type: boolean
-                required:
-                - enabled
                 type: object
               namespaceManagement:
                 description: NamespaceManagement defines the list of namespaces that

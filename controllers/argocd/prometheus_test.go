@@ -28,7 +28,7 @@ func TestReconcileWorkloadStatusAlertRule(t *testing.T) {
 		{
 			name: "monitoring enabled, no existing prom rule",
 			argocd: makeTestArgoCD(func(cr *argoproj.ArgoCD) {
-				cr.Spec.Monitoring.Enabled = true
+				*cr.Spec.Monitoring.Enabled = true
 			}),
 			existingPromRule:  false,
 			wantPromRuleFound: true,
@@ -36,7 +36,7 @@ func TestReconcileWorkloadStatusAlertRule(t *testing.T) {
 		{
 			name: "monitoring disabled, no existing prom rule",
 			argocd: makeTestArgoCD(func(cr *argoproj.ArgoCD) {
-				cr.Spec.Monitoring.Enabled = false
+				*cr.Spec.Monitoring.Enabled = false
 			}),
 			existingPromRule:  false,
 			wantPromRuleFound: false,
@@ -44,7 +44,7 @@ func TestReconcileWorkloadStatusAlertRule(t *testing.T) {
 		{
 			name: "monitoring enabled, existing prom rule",
 			argocd: makeTestArgoCD(func(cr *argoproj.ArgoCD) {
-				cr.Spec.Monitoring.Enabled = true
+				*cr.Spec.Monitoring.Enabled = true
 			}),
 			existingPromRule:  true,
 			wantPromRuleFound: true,
@@ -52,7 +52,7 @@ func TestReconcileWorkloadStatusAlertRule(t *testing.T) {
 		{
 			name: "monitoring disabled, existing prom rule",
 			argocd: makeTestArgoCD(func(cr *argoproj.ArgoCD) {
-				cr.Spec.Monitoring.Enabled = false
+				*cr.Spec.Monitoring.Enabled = false
 			}),
 			existingPromRule:  true,
 			wantPromRuleFound: false,

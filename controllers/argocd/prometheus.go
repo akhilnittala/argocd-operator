@@ -239,7 +239,7 @@ func (r *ReconcileArgoCD) reconcilePrometheusRule(cr *argoproj.ArgoCD) error {
 
 	if prExists {
 
-		if !cr.Spec.Monitoring.Enabled {
+		if !*cr.Spec.Monitoring.Enabled {
 			// PrometheusRule exists but enabled flag has been set to false, delete the PrometheusRule
 			log.Info("instance monitoring disabled, deleting component status tracking prometheusRule")
 			argoutil.LogResourceDeletion(log, promRule, "instance monitoring is disabled")
@@ -248,7 +248,7 @@ func (r *ReconcileArgoCD) reconcilePrometheusRule(cr *argoproj.ArgoCD) error {
 		return nil // PrometheusRule found, do nothing
 	}
 
-	if !cr.Spec.Monitoring.Enabled {
+	if !*cr.Spec.Monitoring.Enabled {
 		return nil // Monitoring not enabled, do nothing.
 	}
 
