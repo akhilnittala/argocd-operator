@@ -271,6 +271,8 @@ func BuildArgoCDAgentTLSArgs(tlsCfg *argoproj.ArgoCDTlsConfig, args map[string]s
 
 func redisTLSVersion(version uint16) string {
 	switch version {
+	case tls.VersionTLS10:
+		return "TLSv1"
 	case tls.VersionTLS11:
 		return "TLSv1.1"
 	case tls.VersionTLS12:
@@ -313,7 +315,7 @@ func MapArgoCDComponentsTLSVersionFromTLSProfileValues(v configv1.TLSProtocolVer
 }
 
 func BuildRedisProtocols(minVersion, maxVersion uint16) []string {
-	order := []uint16{tls.VersionTLS11, tls.VersionTLS12, tls.VersionTLS13}
+	order := []uint16{tls.VersionTLS10, tls.VersionTLS11, tls.VersionTLS12, tls.VersionTLS13}
 	var protocols []string
 	started := false
 	for _, v := range order {
