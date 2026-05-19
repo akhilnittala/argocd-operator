@@ -287,7 +287,7 @@ func redisTLSVersion(version uint16) string {
 func MapRedisTLSVersionFromTLSProfileValues(v configv1.TLSProtocolVersion) string {
 	switch v {
 	case configv1.VersionTLS10:
-		return "TLSv1.0"
+		return "TLSv1"
 	case configv1.VersionTLS11:
 		return "TLSv1.1"
 	case configv1.VersionTLS12:
