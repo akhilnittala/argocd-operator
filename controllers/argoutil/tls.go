@@ -220,6 +220,7 @@ func validateAndParseTLS(tlsCfg *argoproj.ArgoCDTlsConfig) (uint16, uint16, erro
 	if err != nil {
 		return 0, 0, fmt.Errorf("invalid min TLS version: %w", err)
 	}
+
 	maxVer, err := ParseTLSVersion(tlsCfg.MaxVersion)
 	if err != nil {
 		return 0, 0, fmt.Errorf("invalid max TLS version: %w", err)
@@ -337,8 +338,11 @@ func ResolveTLSConfig(tlsCfg *argoproj.ArgoCDTlsConfig) (uint16, uint16, error) 
 	if err != nil {
 		return 0, 0, err
 	}
+	if minVer == 0 {
+		minVer = tls.VersionTLS13
+	}
 	if maxVer == 0 {
-		maxVer = tls.VersionTLS13 // sane default
+		maxVer = tls.VersionTLS13
 	}
 	return minVer, maxVer, nil
 }
