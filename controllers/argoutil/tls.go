@@ -337,6 +337,9 @@ func ResolveTLSConfig(tlsCfg *argoproj.ArgoCDTlsConfig) (uint16, uint16, error) 
 	if err != nil {
 		return 0, 0, err
 	}
+	if maxVer == 0 {
+		maxVer = tls.VersionTLS13 // sane default
+	}
 	return minVer, maxVer, nil
 }
 
