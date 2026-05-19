@@ -616,7 +616,7 @@ func (r *ReconcileArgoCD) reconcileImageUpdaterDeployment(cr *argoproj.ArgoCD, s
 		// Always pass TLS version flags
 		args = append(args, fmt.Sprintf("--tlsminversion=%s", argoutil.TLSVersionName(minVer)), fmt.Sprintf("--tlsmaxversion=%s", argoutil.TLSVersionName(maxVer)))
 		// Only pass cipher flag when configured
-		if tls != nil && len(tls.CipherSuites) > 0 {
+		if len(tls.CipherSuites) > 0 {
 			args = append(args, fmt.Sprintf("--tlsciphers=%s", strings.Join(tls.CipherSuites, ":")))
 		}
 	} else if r.CentralTlsConfigProfile.MinVersion != "" || len(r.CentralTlsConfigProfile.Ciphers) > 0 {

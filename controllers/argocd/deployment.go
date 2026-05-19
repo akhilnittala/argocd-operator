@@ -1248,7 +1248,7 @@ func BuildTLSArgs(tlsCfg *argoproj.ArgoCDTlsConfig, centralTLSConfig TlsConfigPr
 			return nil, err
 		}
 		args := []string{"--tlsminversion", argoutil.TLSVersionName(minVer), "--tlsmaxversion", argoutil.TLSVersionName(maxVer)}
-		if tlsCfg != nil {
+		if len(tlsCfg.CipherSuites) > 0 {
 			if ciphers := argoutil.JoinCiphers(tlsCfg.CipherSuites); ciphers != "" {
 				args = append(args, "--tlsciphers", ciphers)
 			}
