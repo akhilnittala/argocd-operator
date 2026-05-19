@@ -214,7 +214,7 @@ func (r *ReconcileArgoCD) reconcileRepoDeployment(cr *argocdoperatorv1beta1.Argo
 		repoServerVolumeMounts = append(repoServerVolumeMounts, cr.Spec.Repo.VolumeMounts...)
 	}
 
-	arguments, error := argoutil.BuildTLSArgs(cr.Spec.Repo.TlsConfig)
+	arguments, error := BuildTLSArgs(cr.Spec.Repo.TlsConfig, r.CentralTlsConfigProfile)
 	if error != nil {
 		return error
 	}

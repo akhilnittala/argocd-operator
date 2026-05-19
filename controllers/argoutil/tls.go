@@ -28,6 +28,8 @@ import (
 	"strings"
 	"time"
 
+	configv1 "github.com/openshift/api/config/v1"
+
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 
 	argoproj "github.com/argoproj-labs/argocd-operator/api/v1beta1"
@@ -125,13 +127,6 @@ func NewSignedCertificate(cfg *certmanagerv1.CertificateSpec, dnsNames []string,
 	}
 	return x509.ParseCertificate(certDERBytes)
 }
-
-// -------------------- Common Helpers --------------------
-
-const (
-	defaultTLSMinVersion = tls.VersionTLS13
-	defaultTLSMaxVersion = tls.VersionTLS13
-)
 
 // -------------------- TLS Version Maps --------------------
 
@@ -235,27 +230,11 @@ func validateAndParseTLS(tlsCfg *argoproj.ArgoCDTlsConfig) (uint16, uint16, erro
 	return minVer, maxVer, nil
 }
 
-func joinCiphers(cipherSuites []string) string {
+func JoinCiphers(cipherSuites []string) string {
 	if len(cipherSuites) == 0 {
 		return ""
 	}
 	return strings.Join(cipherSuites, ":")
-}
-
-// -------------------- Argo CD TLS Args ------------
-
-func BuildTLSArgs(tlsCfg *argoproj.ArgoCDTlsConfig) ([]string, error) {
-	minVer, maxVer, err := ResolveTLSConfig(tlsCfg)
-	if err != nil {
-		return nil, err
-	}
-	args := []string{"--tlsminversion", TLSVersionName(minVer), "--tlsmaxversion", TLSVersionName(maxVer)}
-	if tlsCfg != nil {
-		if ciphers := joinCiphers(tlsCfg.CipherSuites); ciphers != "" {
-			args = append(args, "--tlsciphers", ciphers)
-		}
-	}
-	return args, nil
 }
 
 // -------------------- Argo CD Agent TLS Args --------------------
@@ -281,7 +260,7 @@ func BuildArgoCDAgentTLSArgs(tlsCfg *argoproj.ArgoCDTlsConfig, args map[string]s
 	args["--tlsminversion"] = agentTLSVersion(minVer)
 	args["--tlsmaxversion"] = agentTLSVersion(maxVer)
 	if tlsCfg != nil {
-		if ciphers := joinCiphers(tlsCfg.CipherSuites); ciphers != "" {
+		if ciphers := JoinCiphers(tlsCfg.CipherSuites); ciphers != "" {
 			args["--tlsciphers"] = ciphers
 		}
 	}
@@ -303,7 +282,37 @@ func redisTLSVersion(version uint16) string {
 	}
 }
 
-func buildRedisProtocols(minVersion, maxVersion uint16) []string {
+func MapRedisTLSVersionFromTLSProfileValues(v configv1.TLSProtocolVersion) string {
+	switch v {
+	case configv1.VersionTLS10:
+		return "TLSv1.0"
+	case configv1.VersionTLS11:
+		return "TLSv1.1"
+	case configv1.VersionTLS12:
+		return "TLSv1.2"
+	case configv1.VersionTLS13:
+		return "TLSv1.3"
+	default:
+		return ""
+	}
+}
+
+func MapArgoCDComponentsTLSVersionFromTLSProfileValues(v configv1.TLSProtocolVersion) string {
+	switch v {
+	case configv1.VersionTLS10:
+		return "1.0"
+	case configv1.VersionTLS11:
+		return "1.1"
+	case configv1.VersionTLS12:
+		return "1.2"
+	case configv1.VersionTLS13:
+		return "1.3"
+	default:
+		return ""
+	}
+}
+
+func BuildRedisProtocols(minVersion, maxVersion uint16) []string {
 	order := []uint16{tls.VersionTLS11, tls.VersionTLS12, tls.VersionTLS13}
 	var protocols []string
 	started := false
@@ -321,38 +330,64 @@ func buildRedisProtocols(minVersion, maxVersion uint16) []string {
 	return protocols
 }
 
-func BuildRedisArgs(tlsCfg *argoproj.ArgoCDTlsConfig) ([]string, error) {
-	minVer, maxVer, err := ResolveTLSConfig(tlsCfg)
-	if err != nil {
-		return nil, err
-	}
-	protocols := buildRedisProtocols(minVer, maxVer)
-	args := []string{"--tls-protocols", strings.Join(protocols, " ")}
-	if tlsCfg == nil || len(tlsCfg.CipherSuites) == 0 {
-		return args, nil
-	}
-	ciphers := joinCiphers(tlsCfg.CipherSuites)
-	hasTLS12OrBelow := minVer <= tls.VersionTLS12
-	hasTLS13 := maxVer >= tls.VersionTLS13
-	if hasTLS12OrBelow {
-		args = append(args, "--tls-ciphers", ciphers)
-	}
-	if hasTLS13 {
-		args = append(args, "--tls-ciphersuites", ciphers)
-	}
-	return args, nil
-}
-
 func ResolveTLSConfig(tlsCfg *argoproj.ArgoCDTlsConfig) (uint16, uint16, error) {
 	minVer, maxVer, err := validateAndParseTLS(tlsCfg)
 	if err != nil {
 		return 0, 0, err
 	}
-	if minVer == 0 {
-		minVer = defaultTLSMinVersion
-	}
-	if maxVer == 0 {
-		maxVer = defaultTLSMaxVersion
-	}
 	return minVer, maxVer, nil
+}
+
+func MapCipherSuites(names []string) []string {
+	m := map[string]string{
+		"TLS_AES_128_GCM_SHA256":       "TLS_AES_128_GCM_SHA256",       // 0x13,0x01
+		"TLS_AES_256_GCM_SHA384":       "TLS_AES_256_GCM_SHA384",       // 0x13,0x02
+		"TLS_CHACHA20_POLY1305_SHA256": "TLS_CHACHA20_POLY1305_SHA256", // 0x13,0x03
+
+		// TLS 1.2
+		"ECDHE-ECDSA-AES128-GCM-SHA256": "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",       // 0xC0,0x2B
+		"ECDHE-RSA-AES128-GCM-SHA256":   "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",         // 0xC0,0x2F
+		"ECDHE-ECDSA-AES256-GCM-SHA384": "TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384",       // 0xC0,0x2C
+		"ECDHE-RSA-AES256-GCM-SHA384":   "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",         // 0xC0,0x30
+		"ECDHE-ECDSA-CHACHA20-POLY1305": "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256", // 0xCC,0xA9
+		"ECDHE-RSA-CHACHA20-POLY1305":   "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256",   // 0xCC,0xA8
+		//"ECDHE-ECDSA-AES128-SHA256":     "TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256",       // 0xC0,0x23
+		//"ECDHE-RSA-AES128-SHA256": "TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256", // 0xC0,0x27
+		//"AES128-GCM-SHA256": "TLS_RSA_WITH_AES_128_GCM_SHA256", // 0x00,0x9C
+		//"AES256-GCM-SHA384": "TLS_RSA_WITH_AES_256_GCM_SHA384", // 0x00,0x9D
+		//"AES128-SHA256":     "TLS_RSA_WITH_AES_128_CBC_SHA256", // 0x00,0x3C
+
+		// Go's crypto/tls does not support CBC mode and DHE ciphers, so we don't want to include them here.
+		// See:
+		//   - https://github.com/golang/go/issues/26652
+		//   - https://github.com/golang/go/issues/7758
+		// "ECDHE-ECDSA-AES256-SHA384":     "TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA384",       // 0xC0,0x24
+		// "ECDHE-RSA-AES256-SHA384":       "TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384",         // 0xC0,0x28
+		// "AES256-SHA256":                 "TLS_RSA_WITH_AES_256_CBC_SHA256",               // 0x00,0x3D
+		// "DHE-RSA-AES128-GCM-SHA256":     "TLS_DHE_RSA_WITH_AES_128_GCM_SHA256",           // 0x00,0x9E
+		// "DHE-RSA-AES256-GCM-SHA384":     "TLS_DHE_RSA_WITH_AES_256_GCM_SHA384",           // 0x00,0x9F
+		// "DHE-RSA-CHACHA20-POLY1305":     "TLS_DHE_RSA_WITH_CHACHA20_POLY1305_SHA256",     // 0xCC,0xAA
+		// "DHE-RSA-AES128-SHA256":         "TLS_DHE_RSA_WITH_AES_128_CBC_SHA256",           // 0x00,0x67
+		// "DHE-RSA-AES256-SHA256":         "TLS_DHE_RSA_WITH_AES_256_CBC_SHA256",           // 0x00,0x6B
+
+		// TLS 1
+		//"ECDHE-ECDSA-AES128-SHA": "TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA", // 0xC0,0x09
+		//"ECDHE-RSA-AES128-SHA":   "TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA",   // 0xC0,0x13
+		//"ECDHE-ECDSA-AES256-SHA": "TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA", // 0xC0,0x0A
+		//"ECDHE-RSA-AES256-SHA":   "TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA",   // 0xC0,0x14
+
+		// SSL 3
+		//"AES128-SHA":             "TLS_RSA_WITH_AES_128_CBC_SHA",        // 0x00,0x2F
+		//"AES256-SHA":             "TLS_RSA_WITH_AES_256_CBC_SHA",        // 0x00,0x35
+		//"DES-CBC3-SHA":           "TLS_RSA_WITH_3DES_EDE_CBC_SHA",       // 0x00,0x0A
+		//"ECDHE-RSA-DES-CBC3-SHA": "TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA", // 0xC0,0x12
+	}
+
+	out := make([]string, 0, len(names))
+	for _, name := range names {
+		if mapped, ok := m[name]; ok {
+			out = append(out, mapped)
+		}
+	}
+	return out
 }
