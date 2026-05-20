@@ -617,10 +617,10 @@ type ArgoCDRepoSpec struct {
 
 type ArgoCDTlsConfig struct {
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:validation:Enum="1.1";"1.2";"1.3"
+	// +kubebuilder:validation:Enum="1.0";"1.1";"1.2";"1.3"
 	MinVersion string `json:"minVersion,omitempty"`
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:validation:Enum="1.1";"1.2";"1.3"
+	// +kubebuilder:validation:Enum="1.0";"1.1";"1.2";"1.3"
 	MaxVersion   string   `json:"maxVersion,omitempty"`
 	CipherSuites []string `json:"cipherSuites,omitempty"`
 }

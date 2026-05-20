@@ -609,19 +609,24 @@ func (r *ReconcileArgoCD) reconcileImageUpdaterDeployment(cr *argoproj.ArgoCD, s
 	args := []string{"run"}
 	tls := cr.Spec.ImageUpdater.TlsConfig
 	if tls != nil {
-		minVer, maxVer, err := argoutil.ResolveTLSConfig(tls)
+		err := argoutil.ValidateTLSConfig(tls)
 		if err != nil {
 			return err
 		}
 		// Always pass TLS version flags
-		args = append(args, fmt.Sprintf("--tlsminversion=%s", argoutil.TLSVersionName(minVer)), fmt.Sprintf("--tlsmaxversion=%s", argoutil.TLSVersionName(maxVer)))
+		if tls.MinVersion != "" {
+			args = append(args, fmt.Sprintf("--tlsminversion=%s", tls.MinVersion))
+		}
+		if tls.MaxVersion != "" {
+			args = append(args, fmt.Sprintf("--tlsmaxversion=%s", tls.MaxVersion))
+		}
 		// Only pass cipher flag when configured
 		if len(tls.CipherSuites) > 0 {
 			args = append(args, fmt.Sprintf("--tlsciphers=%s", strings.Join(tls.CipherSuites, ":")))
 		}
 	} else if r.CentralTlsConfigProfile.MinVersion != "" || len(r.CentralTlsConfigProfile.Ciphers) > 0 {
 		if r.CentralTlsConfigProfile.MinVersion != "" {
-			mappedVersion := argoutil.MapArgoCDComponentsTLSVersionFromTLSProfileValues(r.CentralTlsConfigProfile.MinVersion)
+			mappedVersion := argoutil.TLSProtocolVersionString(r.CentralTlsConfigProfile.MinVersion)
 			args = append(args, "--tlsminversion", mappedVersion)
 		}
 		if len(r.CentralTlsConfigProfile.Ciphers) > 0 {
