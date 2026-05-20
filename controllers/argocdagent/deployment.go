@@ -577,7 +577,7 @@ func getPrincipalResourceProxyCaSecretName(cr *argoproj.ArgoCD) string {
 
 func getPrincipalTlsConfig(cr *argoproj.ArgoCD, centralTLSProfileMinVersion configv1.TLSProtocolVersion, centralTLSProfileCiphers []string) (map[string]string, error) {
 	arguments := make(map[string]string)
-	if hasTLS(cr) {
+	if hasTLS(cr) && cr.Spec.ArgoCDAgent.Principal.TLS.TlsConfig != nil {
 		arguments, err := argoutil.BuildArgoCDAgentTLSArgs(cr.Spec.ArgoCDAgent.Principal.TLS.TlsConfig, arguments)
 		if err != nil {
 			return nil, err
