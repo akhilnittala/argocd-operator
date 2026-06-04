@@ -27,6 +27,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	argoproj "github.com/argoproj-labs/argocd-operator/api/v1beta1"
+	configv1 "github.com/openshift/api/config/v1"
 )
 
 const (
@@ -3083,4 +3084,198 @@ func TestDeploymentWithLongName(t *testing.T) {
 
 	// Verify that the pod template labels match
 	assert.Equal(t, repoDeployment.Name, repoDeployment.Spec.Template.Labels[common.ArgoCDKeyName])
+}
+
+func TestBuildRedisArgs(t *testing.T) {
+	tests := []struct {
+		name       string
+		tlsCfg     *argoproj.ArgoCDTLSConfig
+		centralTLS TLSConfigProfile
+		expected   []string
+		wantErr    bool
+	}{
+		{
+			name:       "nil config and empty central tls",
+			tlsCfg:     nil,
+			centralTLS: TLSConfigProfile{},
+			expected:   nil,
+			wantErr:    false,
+		},
+		{
+			name: "valid CR tls config with tls 1.2",
+			tlsCfg: &argoproj.ArgoCDTLSConfig{
+				MinVersion: "1.2",
+				MaxVersion: "1.2",
+				CipherSuites: []string{
+					"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+				},
+			},
+			centralTLS: TLSConfigProfile{},
+			expected: []string{
+				"--tls-protocols",
+				"TLSv1.2",
+				"--tls-ciphers",
+				"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid CR tls config with tls 1.3",
+			tlsCfg: &argoproj.ArgoCDTLSConfig{
+				MinVersion: "1.3",
+				MaxVersion: "1.3",
+				CipherSuites: []string{
+					"TLS_AES_128_GCM_SHA256",
+				},
+			},
+			centralTLS: TLSConfigProfile{},
+			expected: []string{
+				"--tls-protocols",
+				"TLSv1.3",
+				"--tls-ciphersuites",
+				"TLS_AES_128_GCM_SHA256",
+			},
+			wantErr: false,
+		},
+		{
+			name:   "central TLS config with tls 1.2",
+			tlsCfg: nil,
+			centralTLS: TLSConfigProfile{
+				MinVersion: configv1.VersionTLS12,
+				Ciphers: []string{
+					"ECDHE-RSA-AES128-GCM-SHA256",
+				},
+			},
+			expected: []string{
+				"--tls-protocols",
+				"TLSv1.2",
+				"--tls-ciphers",
+				"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+			},
+			wantErr: false,
+		},
+		{
+			name:   "central TLS config with tls 1.3",
+			tlsCfg: nil,
+			centralTLS: TLSConfigProfile{
+				MinVersion: configv1.VersionTLS13,
+				Ciphers: []string{
+					"TLS_AES_128_GCM_SHA256",
+				},
+			},
+			expected: []string{
+				"--tls-protocols",
+				"TLSv1.3",
+				"--tls-ciphersuites",
+				"TLS_AES_128_GCM_SHA256",
+			},
+			wantErr: false,
+		},
+		{
+			name:   "central TLS config only version",
+			tlsCfg: nil,
+			centralTLS: TLSConfigProfile{
+				MinVersion: configv1.VersionTLS12,
+			},
+			expected: []string{
+				"--tls-protocols",
+				"TLSv1.2",
+			},
+			wantErr: false,
+		},
+		{
+			name:   "central TLS config only ciphers",
+			tlsCfg: nil,
+			centralTLS: TLSConfigProfile{
+				Ciphers: []string{
+					"ECDHE-RSA-AES256-GCM-SHA384",
+				},
+			},
+			expected: []string{
+				"--tls-ciphers",
+				"TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
+			},
+			wantErr: false,
+		},
+		{
+			name: "CR config takes precedence over central TLS config",
+			tlsCfg: &argoproj.ArgoCDTLSConfig{
+				MinVersion: "1.2",
+				CipherSuites: []string{
+					"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+				},
+			},
+			centralTLS: TLSConfigProfile{
+				MinVersion: configv1.VersionTLS13,
+				Ciphers: []string{
+					"TLS_AES_128_GCM_SHA256",
+				},
+			},
+			expected: []string{
+				"--tls-protocols",
+				"TLSv1.2 TLSv1.3",
+				"--tls-ciphers",
+				"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+			},
+			wantErr: false,
+		},
+		{
+			name: "CR config without ciphers",
+			tlsCfg: &argoproj.ArgoCDTLSConfig{
+				MinVersion: "1.2",
+				MaxVersion: "1.3",
+			},
+			centralTLS: TLSConfigProfile{},
+			expected: []string{
+				"--tls-protocols",
+				"TLSv1.2 TLSv1.3",
+			},
+			wantErr: false,
+		},
+		{
+			name: "CR config with ciphers",
+			tlsCfg: &argoproj.ArgoCDTLSConfig{
+				MinVersion: "1.2",
+				MaxVersion: "1.3",
+				CipherSuites: []string{
+					"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+					"TLS_AES_128_GCM_SHA256",
+				},
+			},
+			centralTLS: TLSConfigProfile{},
+			expected: []string{
+				"--tls-protocols",
+				"TLSv1.2 TLSv1.3",
+				"--tls-ciphers",
+				"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256:TLS_AES_128_GCM_SHA256",
+				"--tls-ciphersuites",
+				"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256:TLS_AES_128_GCM_SHA256",
+			},
+			wantErr: false,
+		},
+		{
+			name:   "central TLS config with unmapped cipher",
+			tlsCfg: nil,
+			centralTLS: TLSConfigProfile{
+				MinVersion: configv1.VersionTLS12,
+				Ciphers: []string{
+					"INVALID",
+				},
+			},
+			expected: []string{
+				"--tls-protocols",
+				"TLSv1.2",
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := BuildRedisArgs(tt.tlsCfg, tt.centralTLS)
+			if !reflect.DeepEqual(got, tt.expected) {
+				t.Fatalf("expected %#v got %#v", tt.expected, got)
+			}
+		})
+	}
 }
