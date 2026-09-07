@@ -17,6 +17,7 @@ package argocd
 import (
 	"context"
 	"fmt"
+	"maps"
 	"reflect"
 	"strconv"
 	"strings"
@@ -347,14 +348,6 @@ func (r *ReconcileArgoCD) reconcileConfigMaps(cr *argoproj.ArgoCD, useTLSForRedi
 func (r *ReconcileArgoCD) reconcileCAConfigMap(cr *argoproj.ArgoCD) error {
 	cm := newConfigMapWithName(getCAConfigMapName(cr), cr)
 
-	configMapExists, err := argoutil.IsObjectFound(r.Client, cr.Namespace, cm.Name, cm)
-	if err != nil {
-		return err
-	}
-	if configMapExists {
-		return nil // ConfigMap found, do nothing
-	}
-
 	caSecret := argoutil.NewSecretWithSuffix(cr, common.ArgoCDCASuffix)
 	caSecretExists, err := argoutil.IsObjectFound(r.Client, cr.Namespace, caSecret.Name, caSecret)
 	if err != nil {
@@ -365,15 +358,40 @@ func (r *ReconcileArgoCD) reconcileCAConfigMap(cr *argoproj.ArgoCD) error {
 		return nil
 	}
 
-	cm.Data = map[string]string{
-		common.ArgoCDKeyTLSCert: string(caSecret.Data[common.ArgoCDKeyTLSCert]),
-	}
-
-	if err := controllerutil.SetControllerReference(cr, cm, r.Scheme); err != nil {
+	existingCM := &corev1.ConfigMap{}
+	configMapExists, err := argoutil.IsObjectFound(r.Client, cr.Namespace, cm.Name, existingCM)
+	if err != nil {
 		return err
 	}
-	argoutil.LogResourceCreation(log, cm)
-	return r.Create(context.TODO(), cm)
+
+	desiredData := map[string]string{
+		common.ArgoCDKeyTLSCert:   string(caSecret.Data[common.ArgoCDKeyTLSCert]),
+		common.ArgoCDKeyTLSCACert: string(caSecret.Data[common.ArgoCDKeyTLSCACert]),
+	}
+
+	if !configMapExists {
+		if err := controllerutil.SetControllerReference(cr, cm, r.Scheme); err != nil {
+			return err
+		}
+		cm.Data = desiredData
+		argoutil.LogResourceCreation(log, cm)
+		return r.Create(context.TODO(), cm)
+	}
+
+	// ConfigMap exists — only update if ca.crt key is missing (backfill for pre-fix ConfigMaps)
+	if _, hasCACert := existingCM.Data[common.ArgoCDKeyTLSCACert]; !hasCACert {
+		if existingCM.Data == nil {
+			existingCM.Data = make(map[string]string)
+		}
+		if _, hasTLSCert := existingCM.Data[common.ArgoCDKeyTLSCert]; !hasTLSCert {
+			existingCM.Data[common.ArgoCDKeyTLSCert] = desiredData[common.ArgoCDKeyTLSCert]
+		}
+		existingCM.Data[common.ArgoCDKeyTLSCACert] = desiredData[common.ArgoCDKeyTLSCACert]
+		argoutil.LogResourceUpdate(log, existingCM)
+		return r.Update(context.TODO(), existingCM)
+	}
+
+	return nil
 }
 
 // reconcileConfiguration will ensure that the main ConfigMap for ArgoCD is present.
@@ -404,23 +422,17 @@ func (r *ReconcileArgoCD) reconcileArgoConfigMap(cr *argoproj.ArgoCD) error {
 	cm.Data[common.ArgoCDKeyOIDCConfig] = getOIDCConfig(cr)
 
 	if c := getResourceHealthChecks(cr); c != nil {
-		for k, v := range c {
-			cm.Data[k] = v
-		}
+		maps.Copy(cm.Data, c)
 	}
 
 	if c, err := getResourceIgnoreDifferences(cr); c != nil && err == nil {
-		for k, v := range c {
-			cm.Data[k] = v
-		}
+		maps.Copy(cm.Data, c)
 	} else {
 		return err
 	}
 
 	if c := getResourceActions(cr); c != nil {
-		for k, v := range c {
-			cm.Data[k] = v
-		}
+		maps.Copy(cm.Data, c)
 	}
 
 	resourceExclusions, err := getResourceExclusions(cr)
@@ -505,9 +517,7 @@ func (r *ReconcileArgoCD) reconcileArgoConfigMap(cr *argoproj.ArgoCD) error {
 	}
 
 	if len(cr.Spec.ExtraConfig) > 0 {
-		for k, v := range cr.Spec.ExtraConfig {
-			cm.Data[k] = v
-		}
+		maps.Copy(cm.Data, cr.Spec.ExtraConfig)
 	}
 
 	// Check and set default value for server.rbac.disableApplicationFineGrainedRBACInheritance if not present
@@ -522,7 +532,7 @@ func (r *ReconcileArgoCD) reconcileArgoConfigMap(cr *argoproj.ArgoCD) error {
 		const tokenAnnotation = "openshift.io/token-secret.value"
 		if existing, ok := cm.Data[common.ArgoCDKeyResourceSensitiveMaskAnnotations]; ok && existing != "" {
 			alreadyPresent := false
-			for _, entry := range strings.Split(existing, ",") {
+			for entry := range strings.SplitSeq(existing, ",") {
 				if strings.TrimSpace(entry) == tokenAnnotation {
 					alreadyPresent = true
 					break
@@ -1010,9 +1020,7 @@ func (r *ReconcileArgoCD) reconcileArgoCmdParamsConfigMap(cr *argoproj.ArgoCD) e
 
 	// Copy user-specified command parameters if any
 	if len(cr.Spec.CmdParams) > 0 {
-		for k, v := range cr.Spec.CmdParams {
-			cm.Data[k] = v
-		}
+		maps.Copy(cm.Data, cr.Spec.CmdParams)
 	}
 
 	if err := controllerutil.SetControllerReference(cr, cm, r.Scheme); err != nil {

@@ -10,7 +10,7 @@ VERSION ?= 0.19.0
 # After updating, call 'make update-dependencies'.
 # Notes:
 # - String should NOT begin with 'v' prefix, e.g. 'v3.1.1'
-ARGO_CD_TARGET_VERSION ?= 3.4.2
+ARGO_CD_TARGET_VERSION ?= 3.5.2
 
 # Try to detect Docker or Podman
 CONTAINER_RUNTIME := $(shell command -v docker 2> /dev/null || command -v podman 2> /dev/null)
@@ -42,6 +42,9 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 # Set the Operator SDK version to use.
 # This is useful for CI or a project to utilize a specific version of the operator-sdk toolkit.
 OPERATOR_SDK_VERSION ?= v1.35.0
+
+# K8s version to use for reference documentation.
+KUBERNETES_API_VERSION ?= 1.35
 
 GOSEC_VERSION ?= v2.22.7
 GOLANGCILINT_VERSION ?= v2.12.2
@@ -125,7 +128,7 @@ build: generate fmt vet ## Build manager binary.
 	go build -ldflags=$(LD_FLAGS) -o bin/manager cmd/main.go
 
 run: manifests generate fmt vet ## Run a controller from your host.
-	REDIS_CONFIG_PATH="build/redis" go run -ldflags=$(LD_FLAGS) ./cmd/main.go
+	REDIS_CONFIG_PATH="build/redis" ARGOCD_OPERATOR_NAMESPACE="argocd" go run -ldflags=$(LD_FLAGS) ./cmd/main.go
 
 docker-build: test ## Build docker image with the manager.
 	$(CONTAINER_RUNTIME) build --build-arg LD_FLAGS=$(LD_FLAGS) -t ${IMG} .
@@ -209,23 +212,21 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 
 
 start-e2e: install-prometheus-crds ## Start operator for E2E tests (installs required CRDs if needed)
-	ARGOCD_CLUSTER_CONFIG_NAMESPACES="argocd-e2e-cluster-config, argocd-test-impersonation-1-046, argocd-agent-principal-1-051, argocd-agent-agent-1-052, appset-argocd, appset-old-ns, appset-new-ns, appset-argocd-clusterrole, ns-hosting-principal, ns-hosting-managed-agent, ns-hosting-autonomous-agent" make run
+	ARGOCD_CLUSTER_CONFIG_NAMESPACES="argocd-e2e-cluster-config, argocd-test-impersonation-1-046, argocd-agent-principal-1-051, argocd-agent-agent-1-052, appset-argocd, appset-old-ns, appset-new-ns, appset-argocd-clusterrole, ns-hosting-principal, ns-hosting-managed-agent, ns-hosting-autonomous-agent, gitops-promoter-1-134" make run
 
 all: test install run ## UnitTest, Run the operator locally
 
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
 controller-gen: ## Download controller-gen locally if necessary.
-	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.18.0)
+	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.21.0)
 
 KUSTOMIZE = $(shell pwd)/bin/kustomize
 kustomize: ## Download kustomize locally if necessary.
-	$(call go-install-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v4@v4.5.2)
+	$(call go-install-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v5@v5.8.1)
 
 ENVTEST = $(shell pwd)/bin/setup-envtest
 envtest: ## Download envtest-setup locally if necessary.
-	## Use release-0.22 as the last version that supports Go 1.24 - https://github.com/kubernetes-sigs/controller-runtime/issues/3358
-	## Feel free to update this when we move to Go 1.25+
-	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@release-0.22)
+	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@release-0.24)
 	$(ENVTEST) use 1.26
 
 
@@ -366,7 +367,7 @@ catalog-push: ## Push a catalog image.
 .PHONY: e2e-tests-sequential-ginkgo
 e2e-tests-sequential-ginkgo: ginkgo
 	@echo "Running operator sequential Ginkgo E2E tests..."
-	$(GINKGO_CLI) -v --trace --timeout 100m -r ./tests/ginkgo/sequential
+	$(GINKGO_CLI) -v --trace --timeout 110m -r ./tests/ginkgo/sequential
 
 .PHONY: e2e-tests-parallel-ginkgo
 e2e-tests-parallel-ginkgo: ginkgo
@@ -390,6 +391,26 @@ update-dependencies:
 update-dependencies-argocd:
 	hack/update-dependencies-script/argocd/run.sh
 
+# Updates only Argo CD dependencies
+.PHONY: update-dependencies-gitops-promoter
+update-dependencies-gitops-promoter:
+	hack/update-dependencies-script/gitops-promoter/run.sh
+
+.PHONY: apidocs-gen
+apidocs-gen: ## Generate API documentation.
+	$(call crd-ref-docs,./api/v1alpha1/,./docs/reference/api-v1alpha1.md)
+	$(call crd-ref-docs,./api/v1beta1/,./docs/reference/api-v1beta1.md)
+
+define crd-ref-docs
+# The config have the k8s version injected so it does not have to be updated there
+go run github.com/elastic/crd-ref-docs@v0.3.0 \
+	--config=<(sed 's/__KUBERNETES_API_VERSION__/$(KUBERNETES_API_VERSION)/' ./docs/crd-ref-docs.config.yaml) \
+	--source-path=$(1) \
+	--log-level=info \
+	--renderer=markdown \
+	--output-path=$(2)
+endef
+
 .PHONY: serve-docs
-serve-docs: ## Serve documentation locally using mkdocs in a container
+serve-docs: apidocs-gen ## Serve documentation locally using mkdocs in a container
 	$(CONTAINER_RUNTIME) run --rm -it -p 8000:8000 -v $(PWD):/argocd-operator:Z -w /argocd-operator --name argocd-operator-mkdocs registry.access.redhat.com/ubi9/python-311:latest /bin/bash -c "pip install -r docs/requirements.txt && mkdocs serve -a 0.0.0.0:8000"

@@ -2,7 +2,6 @@ package argocd
 
 import (
 	"context"
-	"strings"
 	"testing"
 	"time"
 
@@ -21,6 +20,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+
+	promoter "github.com/argoproj-labs/gitops-promoter/api/v1alpha1"
+	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 
 	argoproj "github.com/argoproj-labs/argocd-operator/api/v1beta1"
 	"github.com/argoproj-labs/argocd-operator/common"
@@ -46,11 +48,10 @@ func TestReconcileArgoCD_reconcileDexDeployment_with_dex_disabled(t *testing.T) 
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-
 			resObjs := []client.Object{test.argoCD}
 			subresObjs := []client.Object{test.argoCD}
 			runtimeObjs := []runtime.Object{}
-			sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+			sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 			cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 			r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -99,11 +100,10 @@ func TestReconcileArgoCD_reconcileDexDeployment_removes_dex_when_disabled(t *tes
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-
 			resObjs := []client.Object{test.argoCD}
 			subresObjs := []client.Object{test.argoCD}
 			runtimeObjs := []runtime.Object{}
-			sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+			sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 			cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 			r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -171,11 +171,10 @@ func TestReconcileArgoCD_reconcileDeployments_Dex_with_resources(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-
 			resObjs := []client.Object{test.argoCD}
 			subresObjs := []client.Object{test.argoCD}
 			runtimeObjs := []runtime.Object{}
-			sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+			sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 			cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 			r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -239,11 +238,10 @@ func TestReconcileArgoCD_reconcileDeployments_Dex_with_volumes(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-
 			resObjs := []client.Object{test.argoCD}
 			subresObjs := []client.Object{test.argoCD}
 			runtimeObjs := []runtime.Object{}
-			sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+			sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 			cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 			r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -307,7 +305,7 @@ func TestReconcileArgoCD_reconcileDexDeployment(t *testing.T) {
 	resObjs := []client.Object{a}
 	subresObjs := []client.Object{a}
 	runtimeObjs := []runtime.Object{}
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 	cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -594,7 +592,7 @@ func TestReconcileArgoCD_reconcileDexDeployment_withUpdate(t *testing.T) {
 				Containers: []corev1.Container{
 					{
 						Name:  "dex",
-						Image: "ghcr.io/dexidp/dex@sha256:b8469881d3cb3a73001506f0d3aaefecb9c45d2311c1e0f405d8ac538316c59d", // (v2.45.0) NOTE: this value is modified by dependency update script
+						Image: "ghcr.io/dexidp/dex@sha256:8499afd690c437f52301efd2b05b2455da5bd2dfc20332cd697dc9937f808462", // (v2.45.1) NOTE: this value is modified by dependency update script
 						Command: []string{
 							"/shared/argocd-dex",
 							"rundex",
@@ -657,11 +655,10 @@ func TestReconcileArgoCD_reconcileDexDeployment_withUpdate(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-
 			resObjs := []client.Object{test.argoCD}
 			subresObjs := []client.Object{test.argoCD}
 			runtimeObjs := []runtime.Object{}
-			sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+			sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 			cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 			r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -810,7 +807,7 @@ func TestReconcileArgoCD_reconcileDexDeployment_updatesInitContainerFields(t *te
 			resObjs := []client.Object{test.argoCD, existingDeploy}
 			subresObjs := []client.Object{test.argoCD}
 			runtimeObjs := []runtime.Object{}
-			sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+			sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 			cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 			r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -867,11 +864,10 @@ func TestReconcileArgoCD_reconcileDexService_removes_dex_when_disabled(t *testin
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-
 			resObjs := []client.Object{test.argoCD}
 			subresObjs := []client.Object{test.argoCD}
 			runtimeObjs := []runtime.Object{}
-			sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+			sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 			cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 			r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -938,11 +934,10 @@ func TestReconcileArgoCD_reconcileDexServiceAccount_removes_dex_when_disabled(t 
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-
 			resObjs := []client.Object{test.argoCD}
 			subresObjs := []client.Object{test.argoCD}
 			runtimeObjs := []runtime.Object{}
-			sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+			sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 			cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 			r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -1010,11 +1005,10 @@ func TestReconcileArgoCD_reconcileRole_dex_disabled(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-
 			resObjs := []client.Object{test.argoCD}
 			subresObjs := []client.Object{test.argoCD}
 			runtimeObjs := []runtime.Object{}
-			sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+			sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 			cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 			r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -1087,11 +1081,10 @@ func TestReconcileArgoCD_reconcileRoleBinding_dex_disabled(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-
 			resObjs := []client.Object{test.argoCD}
 			subresObjs := []client.Object{test.argoCD}
 			runtimeObjs := []runtime.Object{}
-			sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+			sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 			cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 			r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -1308,7 +1301,7 @@ func TestNeedsDexTokenRenewal(t *testing.T) {
 			name: "valid expiry but empty token - needs renewal",
 			secret: &corev1.Secret{Data: map[string][]byte{
 				"expiry": []byte(time.Now().Add(renewThreshold + time.Hour).UTC().Format(time.RFC3339)),
-				"token":  []byte{},
+				"token":  {},
 			}},
 			want: true,
 		},
@@ -1333,7 +1326,7 @@ func TestReconcileArgoCD_getDexOAuthClientSecret_ReturnsCachedToken(t *testing.T
 		}
 	})
 
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 	cl := makeTestReconcilerClient(sch, []client.Object{a}, []client.Object{a}, nil)
 
 	// First call uses firstToken reactor.
@@ -1369,7 +1362,7 @@ func TestReconcileArgoCD_getDexOAuthClientSecret_RenewsExpiredToken(t *testing.T
 		}
 	})
 
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 	cl := makeTestReconcilerClient(sch, []client.Object{a}, []client.Object{a}, nil)
 	r := makeTestReconciler(cl, sch, makeTestK8sClientWithTokenReactor(renewedToken))
 	assert.NoError(t, createNamespace(r, a.Namespace, ""))
@@ -1409,25 +1402,21 @@ func TestReconcileArgoCD_reconcileDexLegacySATokenSecrets(t *testing.T) {
 		}
 	})
 
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 	cl := makeTestReconcilerClient(sch, []client.Object{a}, []client.Object{a}, nil)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 	assert.NoError(t, createNamespace(r, a.Namespace, ""))
 
-	// Create the Dex SA so the function can fetch it.
 	_, err := r.reconcileServiceAccount(common.ArgoCDDefaultDexServiceAccountName, a)
 	assert.NoError(t, err)
 
 	dexSAName := a.Name + "-" + common.ArgoCDDefaultDexServiceAccountName
 
-	// Create a legacy kubernetes.io/service-account-token Secret.
+	// Kubernetes auto-generated SA token secret: no operator label, uses SA name in the name.
 	legacySecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      dexSAName + "-token-abc12",
+			Name:      "argocd-dex-server-token-abc12",
 			Namespace: a.Namespace,
-			Labels: map[string]string{
-				common.ArgoCDTrackedByOperatorLabel: common.ArgoCDAppName,
-			},
 			Annotations: map[string]string{
 				corev1.ServiceAccountNameKey: dexSAName,
 			},
@@ -1436,33 +1425,29 @@ func TestReconcileArgoCD_reconcileDexLegacySATokenSecrets(t *testing.T) {
 	}
 	assert.NoError(t, r.Create(context.TODO(), legacySecret))
 
-	// Also add a reference to that Secret in the SA.secrets list.
 	sa := &corev1.ServiceAccount{}
 	assert.NoError(t, r.Get(context.TODO(),
 		types.NamespacedName{Name: dexSAName, Namespace: a.Namespace}, sa))
 	sa.Secrets = append(sa.Secrets, corev1.ObjectReference{Name: legacySecret.Name})
 	assert.NoError(t, r.Update(context.TODO(), sa))
 
-	// Run the cleanup.
 	assert.NoError(t, r.reconcileDexLegacySATokenSecrets(a))
 
-	// Legacy Secret must be deleted.
 	deleted := &corev1.Secret{}
 	err = r.Get(context.TODO(),
 		types.NamespacedName{Name: legacySecret.Name, Namespace: a.Namespace}, deleted)
 	assert.True(t, apierrors.IsNotFound(err), "legacy SA token Secret must be deleted")
 
-	// SA.secrets must no longer reference the legacy token.
 	updatedSA := &corev1.ServiceAccount{}
 	assert.NoError(t, r.Get(context.TODO(),
 		types.NamespacedName{Name: dexSAName, Namespace: a.Namespace}, updatedSA))
 	for _, ref := range updatedSA.Secrets {
-		assert.False(t, strings.HasPrefix(ref.Name, dexSAName+"-token-"),
-			"SA.secrets must not contain legacy token reference %q", ref.Name)
+		assert.NotEqual(t, legacySecret.Name, ref.Name,
+			"SA.secrets must not contain legacy token reference")
 	}
 }
 
-func TestReconcileArgoCD_reconcileDexLegacySATokenSecrets_IgnoresUnrelatedSecrets(t *testing.T) {
+func TestReconcileArgoCD_reconcileDexLegacySATokenSecrets_OperatorCreatedSecret(t *testing.T) {
 	logf.SetLogger(ZapLogger(true))
 
 	a := makeTestArgoCD(func(ac *argoproj.ArgoCD) {
@@ -1476,29 +1461,100 @@ func TestReconcileArgoCD_reconcileDexLegacySATokenSecrets_IgnoresUnrelatedSecret
 	cl := makeTestReconcilerClient(sch, []client.Object{a}, []client.Object{a}, nil)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 	assert.NoError(t, createNamespace(r, a.Namespace, ""))
+
 	_, err := r.reconcileServiceAccount(common.ArgoCDDefaultDexServiceAccountName, a)
 	assert.NoError(t, err)
 
-	// Opaque Secret with a similar name must not be deleted.
-	opaqueSecret := &corev1.Secret{
+	dexSAName := a.Name + "-" + common.ArgoCDDefaultDexServiceAccountName
+
+	// Operator-created SA token secret has operator label.
+	legacySecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "argocd-dex-server-token-opaque",
+			Name:      dexSAName + "-token-op123",
 			Namespace: a.Namespace,
 			Labels: map[string]string{
 				common.ArgoCDTrackedByOperatorLabel: common.ArgoCDAppName,
 			},
+			Annotations: map[string]string{
+				corev1.ServiceAccountNameKey: dexSAName,
+			},
+		},
+		Type: corev1.SecretTypeServiceAccountToken,
+	}
+	assert.NoError(t, r.Create(context.TODO(), legacySecret))
+
+	sa := &corev1.ServiceAccount{}
+	assert.NoError(t, r.Get(context.TODO(),
+		types.NamespacedName{Name: dexSAName, Namespace: a.Namespace}, sa))
+	sa.Secrets = append(sa.Secrets, corev1.ObjectReference{Name: legacySecret.Name})
+	assert.NoError(t, r.Update(context.TODO(), sa))
+
+	assert.NoError(t, r.reconcileDexLegacySATokenSecrets(a))
+
+	deleted := &corev1.Secret{}
+	err = r.Get(context.TODO(),
+		types.NamespacedName{Name: legacySecret.Name, Namespace: a.Namespace}, deleted)
+	assert.True(t, apierrors.IsNotFound(err), "operator-created legacy SA token Secret must be deleted")
+
+	updatedSA := &corev1.ServiceAccount{}
+	assert.NoError(t, r.Get(context.TODO(),
+		types.NamespacedName{Name: dexSAName, Namespace: a.Namespace}, updatedSA))
+	for _, ref := range updatedSA.Secrets {
+		assert.NotEqual(t, legacySecret.Name, ref.Name,
+			"SA.secrets must not contain operator-created legacy token reference")
+	}
+}
+
+func TestReconcileArgoCD_reconcileDexLegacySATokenSecrets_IgnoresUnrelatedSecrets(t *testing.T) {
+	logf.SetLogger(ZapLogger(true))
+
+	a := makeTestArgoCD(func(ac *argoproj.ArgoCD) {
+		ac.Spec.SSO = &argoproj.ArgoCDSSOSpec{
+			Provider: argoproj.SSOProviderTypeDex,
+			Dex:      &argoproj.ArgoCDDexSpec{OpenShiftOAuth: true},
+		}
+	})
+
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
+	cl := makeTestReconcilerClient(sch, []client.Object{a}, []client.Object{a}, nil)
+	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
+	assert.NoError(t, createNamespace(r, a.Namespace, ""))
+	_, err := r.reconcileServiceAccount(common.ArgoCDDefaultDexServiceAccountName, a)
+	assert.NoError(t, err)
+
+	// Opaque Secret with a similar name must not be deleted (wrong type).
+	opaqueSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "argocd-dex-server-token-opaque",
+			Namespace: a.Namespace,
 		},
 		Type: corev1.SecretTypeOpaque,
 	}
 	assert.NoError(t, r.Create(context.TODO(), opaqueSecret))
 
+	// SA token secret for a different SA must not be deleted (wrong annotation).
+	otherSATokenSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "other-sa-token-xyz",
+			Namespace: a.Namespace,
+			Annotations: map[string]string{
+				corev1.ServiceAccountNameKey: "some-other-sa",
+			},
+		},
+		Type: corev1.SecretTypeServiceAccountToken,
+	}
+	assert.NoError(t, r.Create(context.TODO(), otherSATokenSecret))
+
 	assert.NoError(t, r.reconcileDexLegacySATokenSecrets(a))
 
-	// Opaque Secret must still exist.
 	kept := &corev1.Secret{}
 	assert.NoError(t, r.Get(context.TODO(),
 		types.NamespacedName{Name: opaqueSecret.Name, Namespace: a.Namespace}, kept),
 		"Opaque Secret must not be deleted by legacy cleanup")
+
+	assert.NoError(t, r.Get(context.TODO(),
+		types.NamespacedName{Name: otherSATokenSecret.Name, Namespace: a.Namespace}, kept),
+		"SA token secret for a different SA must not be deleted by legacy cleanup")
 }
 
 func TestReconcileArgoCD_reconcileDexDeployment_customLabelsAndAnnotations(t *testing.T) {
@@ -1521,7 +1577,7 @@ func TestReconcileArgoCD_reconcileDexDeployment_customLabelsAndAnnotations(t *te
 	resObjs := []client.Object{a}
 	subresObjs := []client.Object{a}
 	runtimeObjs := []runtime.Object{}
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 	cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 

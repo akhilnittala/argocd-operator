@@ -13,6 +13,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	testclient "k8s.io/client-go/kubernetes/fake"
 
+	promoter "github.com/argoproj-labs/gitops-promoter/api/v1alpha1"
+
 	argoprojv1alpha1 "github.com/argoproj-labs/argocd-operator/api/v1alpha1"
 	argoproj "github.com/argoproj-labs/argocd-operator/api/v1beta1"
 	"github.com/argoproj-labs/argocd-operator/controllers/argoutil"
@@ -43,7 +45,7 @@ func controllerDefaultVolumes() []corev1.Volume {
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName: common.ArgoCDRepoServerTLSSecretName,
-					Optional:   boolPtr(true),
+					Optional:   new(true),
 				},
 			},
 		},
@@ -52,7 +54,7 @@ func controllerDefaultVolumes() []corev1.Volume {
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName: common.ArgoCDRedisServerTLSSecretName,
-					Optional:   boolPtr(true),
+					Optional:   new(true),
 				},
 			},
 		},
@@ -69,7 +71,7 @@ func controllerDefaultVolumes() []corev1.Volume {
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: "argocd-cmd-params-cm",
 					},
-					Optional: boolPtr(true),
+					Optional: new(true),
 					Items: []corev1.KeyToPath{
 						{
 							Key:  "controller.profile.enabled",
@@ -143,7 +145,7 @@ func TestReconcileArgoCD_reconcileRedisStatefulSet_HA_disabled(t *testing.T) {
 	resObjs := []client.Object{a}
 	subresObjs := []client.Object{a}
 	runtimeObjs := []runtime.Object{}
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme)
 	cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -162,7 +164,7 @@ func TestReconcileArgoCD_reconcileRedisStatefulSet_HA_enabled(t *testing.T) {
 	resObjs := []client.Object{a}
 	subresObjs := []client.Object{a}
 	runtimeObjs := []runtime.Object{}
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme)
 	cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -213,7 +215,7 @@ func TestReconcileArgoCD_reconcileRedisStatefulSet_MigratesFromLegacyName(t *tes
 	resObjs := []client.Object{a}
 	subresObjs := []client.Object{a}
 	runtimeObjs := []runtime.Object{}
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme)
 	cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -261,7 +263,7 @@ func TestReconcileArgoCD_reconcileApplicationController(t *testing.T) {
 	resObjs := []client.Object{a}
 	subresObjs := []client.Object{a}
 	runtimeObjs := []runtime.Object{}
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme)
 	cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -307,7 +309,7 @@ func TestReconcileArgoCD_reconcileApplicationController_withRedisTLS(t *testing.
 	resObjs := []client.Object{a}
 	subresObjs := []client.Object{a}
 	runtimeObjs := []runtime.Object{}
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme)
 	cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -333,7 +335,8 @@ func TestReconcileArgoCD_reconcileApplicationController_withRedisTLS(t *testing.
 		"--kubectl-parallelism-limit", "10",
 		"--loglevel", "info",
 		"--logformat", "text",
-		"--persist-resource-health"}
+		"--persist-resource-health",
+	}
 	if diff := cmp.Diff(want, command); diff != "" {
 		t.Fatalf("reconciliation failed:\n%s", diff)
 	}
@@ -346,7 +349,7 @@ func TestReconcileArgoCD_reconcileApplicationController_withUpdate(t *testing.T)
 	resObjs := []client.Object{a}
 	subresObjs := []client.Object{a}
 	runtimeObjs := []runtime.Object{}
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme)
 	cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -373,7 +376,8 @@ func TestReconcileArgoCD_reconcileApplicationController_withUpdate(t *testing.T)
 		"--kubectl-parallelism-limit", "10",
 		"--loglevel", "info",
 		"--logformat", "text",
-		"--persist-resource-health"}
+		"--persist-resource-health",
+	}
 	if diff := cmp.Diff(want, command); diff != "" {
 		t.Fatalf("reconciliation failed:\n%s", diff)
 	}
@@ -386,7 +390,7 @@ func TestReconcileArgoCD_reconcileApplicationController_withUpgrade(t *testing.T
 	resObjs := []client.Object{a}
 	subresObjs := []client.Object{a}
 	runtimeObjs := []runtime.Object{}
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme)
 	cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -418,7 +422,7 @@ func TestReconcileArgoCD_reconcileApplicationController_withResources(t *testing
 	resObjs := []client.Object{a, &ex}
 	subresObjs := []client.Object{a, &ex}
 	runtimeObjs := []runtime.Object{}
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme, argoprojv1alpha1.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, argoprojv1alpha1.AddToScheme)
 	cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -491,7 +495,7 @@ func TestReconcileArgoCD_reconcileApplicationController_withSharding(t *testing.
 					ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
 						LocalObjectReference: corev1.LocalObjectReference{Name: common.ArgoCDConfigMapName},
 						Key:                  common.ArgoCDKeyTimeout,
-						Optional:             boolPtr(true),
+						Optional:             new(true),
 					},
 				}},
 				{Name: "HOME", Value: "/home/argocd"},
@@ -516,7 +520,7 @@ func TestReconcileArgoCD_reconcileApplicationController_withSharding(t *testing.
 					ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
 						LocalObjectReference: corev1.LocalObjectReference{Name: common.ArgoCDConfigMapName},
 						Key:                  common.ArgoCDKeyTimeout,
-						Optional:             boolPtr(true),
+						Optional:             new(true),
 					},
 				}},
 				{Name: "HOME", Value: "/home/argocd"},
@@ -541,7 +545,7 @@ func TestReconcileArgoCD_reconcileApplicationController_withSharding(t *testing.
 					ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
 						LocalObjectReference: corev1.LocalObjectReference{Name: common.ArgoCDConfigMapName},
 						Key:                  common.ArgoCDKeyTimeout,
-						Optional:             boolPtr(true),
+						Optional:             new(true),
 					},
 				}},
 				{Name: "HOME", Value: "/home/argocd"},
@@ -551,7 +555,7 @@ func TestReconcileArgoCD_reconcileApplicationController_withSharding(t *testing.
 		{
 			sharding: argoproj.ArgoCDApplicationControllerShardSpec{
 				//nolint:staticcheck // SA1019: honor deprecated field for backward compatibility
-				DynamicScalingEnabled: boolPtr(true),
+				DynamicScalingEnabled: new(true),
 				MinShards:             2,
 				MaxShards:             4,
 				ClustersPerShard:      1,
@@ -569,7 +573,7 @@ func TestReconcileArgoCD_reconcileApplicationController_withSharding(t *testing.
 					ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
 						LocalObjectReference: corev1.LocalObjectReference{Name: common.ArgoCDConfigMapName},
 						Key:                  common.ArgoCDKeyTimeout,
-						Optional:             boolPtr(true),
+						Optional:             new(true),
 					},
 				}},
 				{Name: "HOME", Value: "/home/argocd"},
@@ -586,7 +590,7 @@ func TestReconcileArgoCD_reconcileApplicationController_withSharding(t *testing.
 		resObjs := []client.Object{a}
 		subresObjs := []client.Object{a}
 		runtimeObjs := []runtime.Object{}
-		sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+		sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme)
 		cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 		r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -618,7 +622,6 @@ func TestReconcileArgoCD_reconcileApplicationController_withSharding(t *testing.
 }
 
 func TestReconcileArgoCD_reconcileApplicationController_withAppSync(t *testing.T) {
-
 	expectedEnv := []corev1.EnvVar{
 		{Name: "ARGOCD_APPLICATION_CONTROLLER_PERSIST_RESOURCE_HEALTH", ValueFrom: &corev1.EnvVarSource{
 			ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
@@ -638,7 +641,7 @@ func TestReconcileArgoCD_reconcileApplicationController_withAppSync(t *testing.T
 	resObjs := []client.Object{a}
 	subresObjs := []client.Object{a}
 	runtimeObjs := []runtime.Object{}
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme)
 	cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -663,7 +666,6 @@ func TestReconcileArgoCD_reconcileApplicationController_withAppSync(t *testing.T
 }
 
 func TestReconcileArgoCD_reconcileApplicationController_withEnv(t *testing.T) {
-
 	expectedEnv := []corev1.EnvVar{
 		{Name: "ARGOCD_APPLICATION_CONTROLLER_PERSIST_RESOURCE_HEALTH", ValueFrom: &corev1.EnvVarSource{
 			ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
@@ -675,7 +677,7 @@ func TestReconcileArgoCD_reconcileApplicationController_withEnv(t *testing.T) {
 			ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
 				LocalObjectReference: corev1.LocalObjectReference{Name: common.ArgoCDConfigMapName},
 				Key:                  common.ArgoCDKeyTimeout,
-				Optional:             boolPtr(true),
+				Optional:             new(true),
 			},
 		}},
 		{Name: "CUSTOM_ENV_VAR", Value: "custom-value"},
@@ -693,7 +695,7 @@ func TestReconcileArgoCD_reconcileApplicationController_withEnv(t *testing.T) {
 	resObjs := []client.Object{a}
 	subresObjs := []client.Object{a}
 	runtimeObjs := []runtime.Object{}
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme)
 	cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -718,7 +720,6 @@ func TestReconcileArgoCD_reconcileApplicationController_withEnv(t *testing.T) {
 }
 
 func Test_UpdateNodePlacementStateful(t *testing.T) {
-
 	ss := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "argocd-sample-server",
@@ -773,7 +774,6 @@ func Test_UpdateNodePlacementStateful(t *testing.T) {
 }
 
 func Test_ContainsInvalidImage(t *testing.T) {
-
 	a := makeTestArgoCD()
 	po := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -790,7 +790,7 @@ func Test_ContainsInvalidImage(t *testing.T) {
 	}
 
 	runtimeObjs := []runtime.Object{}
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme)
 	cl := makeTestReconcilerClient(sch, objs, objs, runtimeObjs)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -803,14 +803,14 @@ func Test_ContainsInvalidImage(t *testing.T) {
 
 	// Test that containsInvalidImage returns true if the Pod is in ErrImagePull
 	po.Status.ContainerStatuses = []corev1.ContainerStatus{
-		{State: corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{Reason: "ErrImagePull"}}}}
+		{State: corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{Reason: "ErrImagePull"}}},
+	}
 	err = cl.Status().Update(context.Background(), po)
 	assert.NoError(t, err)
 
 	containsInvalidImageRes, err = containsInvalidImage(*a, r)
 	assert.NoError(t, err)
 	assert.True(t, containsInvalidImageRes)
-
 }
 
 func TestReconcileArgoCD_reconcileApplicationController_withDynamicSharding(t *testing.T) {
@@ -826,7 +826,7 @@ func TestReconcileArgoCD_reconcileApplicationController_withDynamicSharding(t *t
 				Enabled:  false,
 				Replicas: 1,
 				//nolint:staticcheck // SA1019: honor deprecated field for backward compatibility
-				DynamicScalingEnabled: boolPtr(true),
+				DynamicScalingEnabled: new(true),
 				MinShards:             2,
 				MaxShards:             4,
 				ClustersPerShard:      1,
@@ -839,7 +839,7 @@ func TestReconcileArgoCD_reconcileApplicationController_withDynamicSharding(t *t
 				Enabled:  false,
 				Replicas: 1,
 				//nolint:staticcheck // SA1019: honor deprecated field for backward compatibility
-				DynamicScalingEnabled: boolPtr(true),
+				DynamicScalingEnabled: new(true),
 				MinShards:             1,
 				MaxShards:             4,
 				ClustersPerShard:      3,
@@ -852,7 +852,7 @@ func TestReconcileArgoCD_reconcileApplicationController_withDynamicSharding(t *t
 				Enabled:  false,
 				Replicas: 1,
 				//nolint:staticcheck // SA1019: honor deprecated field for backward compatibility
-				DynamicScalingEnabled: boolPtr(true),
+				DynamicScalingEnabled: new(true),
 				MinShards:             1,
 				MaxShards:             2,
 				ClustersPerShard:      1,
@@ -878,7 +878,7 @@ func TestReconcileArgoCD_reconcileApplicationController_withDynamicSharding(t *t
 		resObjs := []client.Object{a}
 		subresObjs := []client.Object{a}
 		runtimeObjs := []runtime.Object{}
-		sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+		sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme)
 		cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 		r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -906,7 +906,7 @@ func TestReconcileAppController_Initcontainer(t *testing.T) {
 	resObjs := []client.Object{a}
 	subresObjs := []client.Object{a}
 	runtimeObjs := []runtime.Object{}
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme)
 	cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -954,7 +954,7 @@ func TestReconcileArgoCD_sidecarcontainer(t *testing.T) {
 	resObjs := []client.Object{a}
 	subresObjs := []client.Object{a}
 	runtimeObjs := []runtime.Object{}
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme)
 	cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -998,7 +998,7 @@ func TestReconcileArgoCD_reconcileRedisStatefulSet_RevertDrift(t *testing.T) {
 	resObjs := []client.Object{a}
 	subresObjs := []client.Object{a}
 	runtimeObjs := []runtime.Object{}
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme)
 	cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -1019,14 +1019,7 @@ func TestReconcileArgoCD_reconcileRedisStatefulSet_RevertDrift(t *testing.T) {
 	assert.NoError(t, r.reconcileRedisStatefulSet(a))
 	assert.NoError(t, r.Get(context.TODO(), types.NamespacedName{Name: s.Name, Namespace: a.Namespace}, s))
 
-	envVarFound := false
-	for _, env := range s.Spec.Template.Spec.Containers[0].Env {
-		if env.Name == "NEW_ENV_VAR" {
-			envVarFound = true
-			break
-		}
-	}
-	assert.False(t, envVarFound, "NEW_ENV_VAR should not be present")
+	assert.Nil(t, argoutil.EnvGet(s.Spec.Template.Spec.Containers[0].Env, "NEW_ENV_VAR"), "NEW_ENV_VAR should not be present")
 
 	// Modify the SecurityContext
 	assert.NoError(t, r.Get(context.TODO(), types.NamespacedName{Name: s.Name, Namespace: a.Namespace}, s))
@@ -1053,14 +1046,7 @@ func TestReconcileArgoCD_reconcileRedisStatefulSet_RevertDrift(t *testing.T) {
 	assert.NoError(t, r.reconcileRedisStatefulSet(a))
 	assert.NoError(t, r.Get(context.TODO(), types.NamespacedName{Name: s.Name, Namespace: a.Namespace}, s))
 
-	envVarFound = false
-	for _, env := range s.Spec.Template.Spec.InitContainers[0].Env {
-		if env.Name == "NEW_ENV_VAR" {
-			envVarFound = true
-			break
-		}
-	}
-	assert.False(t, envVarFound, "NEW_ENV_VAR should not be present")
+	assert.Nil(t, argoutil.EnvGet(s.Spec.Template.Spec.InitContainers[0].Env, "NEW_ENV_VAR"), "NEW_ENV_VAR should not be present")
 
 	// Modify the container volume and volume mount
 	s.Spec.Template.Spec.Containers[0].VolumeMounts = append(s.Spec.Template.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{
@@ -1127,7 +1113,7 @@ func TestStatefulSetWithLongName(t *testing.T) {
 	resObjs := []client.Object{a}
 	subresObjs := []client.Object{a}
 	runtimeObjs := []runtime.Object{}
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme)
 	cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -1243,7 +1229,7 @@ func TestReconcileArgoCD_reconcileApplicationControllerStatefulSet_LegacyCleanup
 	resObjs := []client.Object{a, legacyOwnedSS}
 	subresObjs := []client.Object{a}
 	runtimeObjs := []runtime.Object{}
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme)
 	cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -1289,7 +1275,7 @@ func TestReconcileArgoCD_reconcileRedisStatefulSet_customLabelsAndAnnotations(t 
 	resObjs := []client.Object{a}
 	subresObjs := []client.Object{a}
 	runtimeObjs := []runtime.Object{}
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme)
 	cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"reflect"
 	"strings"
 	"time"
@@ -27,10 +28,10 @@ import (
 
 // DexConnector represents an authentication connector for Dex.
 type DexConnector struct {
-	Config map[string]interface{} `yaml:"config,omitempty"`
-	ID     string                 `yaml:"id"`
-	Name   string                 `yaml:"name"`
-	Type   string                 `yaml:"type"`
+	Config map[string]any `yaml:"config,omitempty"`
+	ID     string         `yaml:"id"`
+	Name   string         `yaml:"name"`
+	Type   string         `yaml:"type"`
 }
 
 // UseDex determines whether Dex resources should be created and configured or not
@@ -164,15 +165,13 @@ func (r *ReconcileArgoCD) getDexOAuthClientSecret(cr *argoproj.ArgoCD) (*string,
 func (r *ReconcileArgoCD) reconcileDexLegacySATokenSecrets(cr *argoproj.ArgoCD) error {
 	dexSAName := newServiceAccountWithName(common.ArgoCDDefaultDexServiceAccountName, cr).Name
 	secretList := &corev1.SecretList{}
-	if err := r.List(context.TODO(), secretList,
-		client.InNamespace(cr.Namespace),
-		client.MatchingLabels(map[string]string{
-			common.ArgoCDTrackedByOperatorLabel: common.ArgoCDAppName,
-		}),
-	); err != nil {
+	if err := r.List(context.TODO(), secretList, client.InNamespace(cr.Namespace)); err != nil {
 		return err
 	}
-	var deleteErrs []error
+	var (
+		deleteErrs         []error
+		deletedSecretNames = map[string]struct{}{}
+	)
 	for i := range secretList.Items {
 		s := &secretList.Items[i]
 		if s.Type != corev1.SecretTypeServiceAccountToken {
@@ -181,14 +180,14 @@ func (r *ReconcileArgoCD) reconcileDexLegacySATokenSecrets(cr *argoproj.ArgoCD) 
 		if s.Annotations[corev1.ServiceAccountNameKey] != dexSAName {
 			continue
 		}
-
-		if !strings.HasPrefix(s.Name, dexSAName+"-token-") {
-			continue
-		}
 		argoutil.LogResourceDeletion(log, s, "removing legacy Dex service account token secret")
-		if err := r.Delete(context.TODO(), s); err != nil && !apierrors.IsNotFound(err) {
-			deleteErrs = append(deleteErrs, fmt.Errorf("delete legacy dex token secret %s/%s: %w", s.Namespace, s.Name, err))
+		if err := r.Delete(context.TODO(), s); err != nil {
+			if !apierrors.IsNotFound(err) {
+				deleteErrs = append(deleteErrs, fmt.Errorf("delete legacy dex token secret %s/%s: %w", s.Namespace, s.Name, err))
+				continue
+			}
 		}
+		deletedSecretNames[s.Name] = struct{}{}
 	}
 	sa := newServiceAccountWithName(common.ArgoCDDefaultDexServiceAccountName, cr)
 	if err := argoutil.FetchObject(r.Client, cr.Namespace, sa.Name, sa); err != nil {
@@ -197,10 +196,9 @@ func (r *ReconcileArgoCD) reconcileDexLegacySATokenSecrets(cr *argoproj.ArgoCD) 
 		}
 		return errors.Join(append([]error{err}, deleteErrs...)...)
 	}
-	var filtered []corev1.ObjectReference
+	filtered := make([]corev1.ObjectReference, 0, len(sa.Secrets))
 	for _, ref := range sa.Secrets {
-		// Legacy auto token refs only (matches delete loop).
-		if strings.HasPrefix(ref.Name, dexSAName+"-token-") {
+		if _, deleted := deletedSecretNames[ref.Name]; deleted {
 			continue
 		}
 		filtered = append(filtered, ref)
@@ -289,7 +287,7 @@ func (r *ReconcileArgoCD) getOpenShiftDexConfig(cr *argoproj.ArgoCD) (string, er
 		Type: "openshift",
 		ID:   "openshift",
 		Name: "OpenShift",
-		Config: map[string]interface{}{
+		Config: map[string]any{
 			"issuer":       "https://kubernetes.default.svc", // TODO: Should this be hard-coded?
 			"clientID":     getDexOAuthClientID(cr),
 			"clientSecret": "$oidc.dex.clientSecret",
@@ -302,7 +300,7 @@ func (r *ReconcileArgoCD) getOpenShiftDexConfig(cr *argoproj.ArgoCD) (string, er
 	connectors := make([]DexConnector, 0)
 	connectors = append(connectors, connector)
 
-	dex := make(map[string]interface{})
+	dex := make(map[string]any)
 	dex["connectors"] = connectors
 
 	// add dex config from the Argo CD CR.
@@ -314,20 +312,18 @@ func (r *ReconcileArgoCD) getOpenShiftDexConfig(cr *argoproj.ArgoCD) (string, er
 	return string(bytes), err
 }
 
-func addDexConfigFromCR(cr *argoproj.ArgoCD, dex map[string]interface{}) error {
+func addDexConfigFromCR(cr *argoproj.ArgoCD, dex map[string]any) error {
 	dexCfgStr := getDexConfig(cr)
 	if dexCfgStr == "" {
 		return nil
 	}
 
-	dexCfg := make(map[string]interface{})
+	dexCfg := make(map[string]any)
 	if err := yaml.Unmarshal([]byte(dexCfgStr), dexCfg); err != nil {
 		return err
 	}
 
-	for k, v := range dexCfg {
-		dex[k] = v
-	}
+	maps.Copy(dex, dexCfg)
 
 	return nil
 }
@@ -417,14 +413,10 @@ func (r *ReconcileArgoCD) reconcileDexDeployment(cr *argoproj.ArgoCD) error {
 		}
 
 		if cr.Spec.SSO.Dex.Annotations != nil {
-			for key, value := range cr.Spec.SSO.Dex.Annotations {
-				deploy.Spec.Template.Annotations[key] = value
-			}
+			maps.Copy(deploy.Spec.Template.Annotations, cr.Spec.SSO.Dex.Annotations)
 		}
 		if cr.Spec.SSO.Dex.Labels != nil {
-			for key, value := range cr.Spec.SSO.Dex.Labels {
-				deploy.Spec.Template.Labels[key] = value
-			}
+			maps.Copy(deploy.Spec.Template.Labels, cr.Spec.SSO.Dex.Labels)
 		}
 		deploy.Spec.Template.Labels[common.ArgoCDKeyName] = nameWithSuffix("dex-server", cr)
 	}

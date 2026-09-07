@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"reflect"
 	"sort"
 	"strings"
@@ -278,15 +279,11 @@ func (r *ReconcileArgoCD) reconcileApplicationSetDeployment(cr *argoproj.ArgoCD,
 	}
 
 	if cr.Spec.ApplicationSet.Annotations != nil {
-		for key, value := range cr.Spec.ApplicationSet.Annotations {
-			deploy.Spec.Template.Annotations[key] = value
-		}
+		maps.Copy(deploy.Spec.Template.Annotations, cr.Spec.ApplicationSet.Annotations)
 	}
 
 	if cr.Spec.ApplicationSet.Labels != nil {
-		for key, value := range cr.Spec.ApplicationSet.Labels {
-			deploy.Spec.Template.Labels[key] = value
-		}
+		maps.Copy(deploy.Spec.Template.Labels, cr.Spec.ApplicationSet.Labels)
 	}
 
 	appSetContainer, err := r.applicationSetContainer(cr, addSCMGitlabVolumeMount)
@@ -414,7 +411,7 @@ func (r *ReconcileArgoCD) applicationSetContainer(cr *argoproj.ArgoCD, addSCMGit
 						Name: common.ArgoCDCmdParamsConfigMapName,
 					},
 					Key:      common.ArgoCDApplicationSetControllerTokenRefStrictModeCmdParamKey,
-					Optional: boolPtr(true),
+					Optional: new(true),
 				},
 			},
 		},
@@ -521,10 +518,37 @@ func (r *ReconcileArgoCD) reconcileApplicationSetServiceAccount(cr *argoproj.Arg
 			return sa, err
 		}
 
+		if !IsOpenShiftCluster() {
+			refs, err := r.getImagePullSecretRefs(cr)
+			if err != nil {
+				return sa, err
+			}
+			sa.ImagePullSecrets = refs
+		}
 		argoutil.LogResourceCreation(log, sa)
-		err := r.Create(context.TODO(), sa)
+		if err := r.Create(context.TODO(), sa); err != nil {
+			return sa, err
+		}
+		return sa, nil
+	}
+
+	// On OpenShift the platform injects dockercfg secrets into SAs;
+	// do not touch ImagePullSecrets to avoid clobbering them.
+	if !IsOpenShiftCluster() {
+		desired, err := r.getImagePullSecretRefs(cr)
 		if err != nil {
 			return sa, err
+		}
+		existing := sa.ImagePullSecrets
+		if existing == nil {
+			existing = []corev1.LocalObjectReference{}
+		}
+		if !reflect.DeepEqual(existing, desired) {
+			sa.ImagePullSecrets = desired
+			argoutil.LogResourceUpdate(log, sa, "imagePullSecrets changed")
+			if err := r.Update(context.TODO(), sa); err != nil {
+				return sa, err
+			}
 		}
 	}
 

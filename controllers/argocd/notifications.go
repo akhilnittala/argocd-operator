@@ -229,17 +229,45 @@ func (r *ReconcileArgoCD) reconcileNotificationsServiceAccount(cr *argoproj.Argo
 			return nil, err
 		}
 
+		if !IsOpenShiftCluster() {
+			refs, err := r.getImagePullSecretRefs(cr)
+			if err != nil {
+				return nil, err
+			}
+			sa.ImagePullSecrets = refs
+		}
 		argoutil.LogResourceCreation(log, sa)
-		err := r.Create(context.TODO(), sa)
+		err = r.Create(context.TODO(), sa)
 		if err != nil {
 			return nil, err
 		}
+		return sa, nil
 	}
 
 	// SA exists but shouldn't, so it should be deleted
 	if !isNotificationsEnabled(cr) {
 		argoutil.LogResourceDeletion(log, sa, "notifications are disabled")
 		return nil, r.Delete(context.TODO(), sa)
+	}
+
+	// On OpenShift the platform injects dockercfg secrets into SAs;
+	// do not touch ImagePullSecrets to avoid clobbering them.
+	if !IsOpenShiftCluster() {
+		desired, err := r.getImagePullSecretRefs(cr)
+		if err != nil {
+			return nil, err
+		}
+		existing := sa.ImagePullSecrets
+		if existing == nil {
+			existing = []corev1.LocalObjectReference{}
+		}
+		if !reflect.DeepEqual(existing, desired) {
+			sa.ImagePullSecrets = desired
+			argoutil.LogResourceUpdate(log, sa, "imagePullSecrets changed")
+			if err := r.Update(context.TODO(), sa); err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	return sa, nil
@@ -504,7 +532,7 @@ func (r *ReconcileArgoCD) reconcileNotificationsDeployment(cr *argoproj.ArgoCD, 
 
 	podSpec := &desiredDeployment.Spec.Template.Spec
 	podSpec.SecurityContext = &corev1.PodSecurityContext{
-		RunAsNonRoot: boolPtr(true),
+		RunAsNonRoot: new(true),
 	}
 	AddSeccompProfileForOpenShift(r.Client, podSpec)
 	podSpec.ServiceAccountName = sa.Name
@@ -524,7 +552,7 @@ func (r *ReconcileArgoCD) reconcileNotificationsDeployment(cr *argoproj.ArgoCD, 
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName: common.ArgoCDRepoServerTLSSecretName,
-					Optional:   boolPtr(true),
+					Optional:   new(true),
 				},
 			},
 		},

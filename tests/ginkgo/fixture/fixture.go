@@ -29,6 +29,7 @@ import (
 	apierr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/argoproj-labs/argocd-operator/controllers/argoutil"
 	osFixture "github.com/argoproj-labs/argocd-operator/tests/ginkgo/fixture/os"
 	"github.com/argoproj-labs/argocd-operator/tests/ginkgo/fixture/utils"
 )
@@ -55,7 +56,7 @@ func WaitForRootPartitionToHaveMinimumDiskSpace() {
 	for {
 
 		output, err := osFixture.ExecCommandWithOutputParam(false, false, "df", "-k")
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).ToNot(HaveOccurred(), "failed to execute `df -k` command")
 
 		// Output from 'df' looks like this:
 		// Filesystem     1K-blocks     Used Available Use% Mounted on
@@ -347,14 +348,9 @@ func waitForAllEnvVarsToBeRemovedFromDeployments(ns string, envVarKeys []string,
 
 				// For each env var we are looking for
 				for _, envVarKey := range envVarKeys {
-
-					for _, containerEnvKey := range container.Env {
-
-						if containerEnvKey.Name == envVarKey {
-							GinkgoWriter.Println("Waiting:", containerEnvKey, "is still present in Deployment ", depl.Name)
-							return false
-						}
-
+					if env := argoutil.EnvGet(container.Env, envVarKey); env != nil {
+						GinkgoWriter.Println("Waiting:", env, "is still present in Deployment ", depl.Name)
+						return false
 					}
 				}
 			}
@@ -613,7 +609,7 @@ func OutputDebugOnFail(namespaceParams ...any) {
 
 	for _, namespace := range namespaces {
 
-		kubectlOutput, err := osFixture.ExecCommandWithOutputParam(false, true, "kubectl", "get", "all", "-n", namespace)
+		kubectlOutput, err := osFixture.ExecCommandWithOutputParam(false, true, "kubectl", "get", "all,serviceaccount", "-n", namespace)
 		if err != nil {
 			GinkgoWriter.Println("unable to list", namespace, err, kubectlOutput)
 			continue

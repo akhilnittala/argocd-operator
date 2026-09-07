@@ -17,6 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"slices"
 	"strings"
 
 	routev1 "github.com/openshift/api/route/v1"
@@ -28,10 +29,6 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-func init() {
-	SchemeBuilder.Register(&ArgoCD{}, &ArgoCDList{})
-}
 
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 // Important: Run "make" to regenerate code after modifying this file
@@ -79,7 +76,6 @@ type ArgoCDApplicationControllerProcessorsSpec struct {
 
 // ArgoCDApplicationControllerSpec defines the options for the ArgoCD Application Controller component.
 type ArgoCDApplicationControllerSpec struct {
-
 	// InitContainers defines the list of initialization containers for the Application Controller component.
 	InitContainers []corev1.Container `json:"initContainers,omitempty"`
 
@@ -148,7 +144,6 @@ func (a *ArgoCDApplicationControllerSpec) IsEnabled() bool {
 
 // ArgoCDApplicationControllerShardSpec defines the options available for enabling sharding for the Application Controller component.
 type ArgoCDApplicationControllerShardSpec struct {
-
 	// Enabled defines whether sharding should be enabled on the Application Controller component.
 	Enabled bool `json:"enabled,omitempty"`
 
@@ -177,7 +172,6 @@ type ArgoCDApplicationControllerShardSpec struct {
 
 // ArgoCDApplicationSet defines whether the Argo CD ApplicationSet controller should be installed.
 type ArgoCDApplicationSet struct {
-
 	// Env lets you specify environment for applicationSet controller pods
 	Env []corev1.EnvVar `json:"env,omitempty"`
 
@@ -250,6 +244,32 @@ type ArgoCDCASpec struct {
 type ArgoCDCertificateSpec struct {
 	// SecretName is the name of the Secret containing the Certificate and Key.
 	SecretName string `json:"secretName"`
+}
+
+type ArgoCDCommitServerSpec struct {
+	// InitContainers defines the list of initialization containers.
+	InitContainers []corev1.Container `json:"initContainers,omitempty"`
+
+	// LogLevel refers to the log level to be used by the component. Defaults to ArgoCDDefaultLogLevel if not set.  Valid options are debug, info, error, and warn.
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Log Level",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldGroup:CommitServer","urn:alm:descriptor:com.tectonic.ui:text"}
+	LogLevel string `json:"logLevel,omitempty"`
+
+	// LogFormat refers to the log level to be used by the component. Defaults to ArgoCDDefaultLogFormat if not configured. Valid options are text or json.
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Log Format",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldGroup:CommitServer","urn:alm:descriptor:com.tectonic.ui:text"}
+	LogFormat string `json:"logFormat,omitempty"`
+
+	// Resources defines the Compute Resources required by the container for the component.
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Resource Requirements",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldGroup:CommitServer","urn:alm:descriptor:com.tectonic.ui:resourceRequirements"}
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// Env lets specifies the environment variables for the pods.
+	Env []corev1.EnvVar `json:"env,omitempty"`
+
+	// Custom annotations to pods deployed by the operator
+	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// Custom labels to pods deployed by the operator
+	Labels map[string]string `json:"labels,omitempty"`
 }
 
 // ArgoCDDexSpec defines the desired state for the Dex server component.
@@ -421,7 +441,6 @@ type ArgoCDList struct {
 
 // ArgoCDNotifications defines whether the Argo CD Notifications controller should be installed.
 type ArgoCDNotifications struct {
-
 	// Replicas defines the number of replicas to run for notifications-controller
 	Replicas *int32 `json:"replicas,omitempty"`
 
@@ -567,7 +586,6 @@ func (a *ArgoCDRedisSpec) IsRemote() bool {
 
 // ArgoCDRepoSpec defines the desired state for the Argo CD repo server component.
 type ArgoCDRepoSpec struct {
-
 	// Extra Command arguments allows users to pass command line arguments to repo server workload. They get added to default command line arguments provided
 	// by the operator.
 	// Please note that the command line arguments provided as part of ExtraRepoCommandArgs will not overwrite the default command line arguments.
@@ -793,6 +811,16 @@ type ArgoCDServerServiceSpec struct {
 	Type corev1.ServiceType `json:"type"`
 }
 
+type ArgoCDSourceHydratorSpec struct {
+	// Enabled defines whether the Source Hydrator is enabled.
+	Enabled *bool `json:"enabled,omitempty"`
+}
+
+func (a *ArgoCDSourceHydratorSpec) IsEnabled() bool {
+	// The feature is an opt-in, so consider disabled when sourceHydrator is missing or not explicitly enabled.
+	return a != nil && a.Enabled != nil && *a.Enabled
+}
+
 // Resource Customization for custom health check
 type ResourceHealthCheck struct {
 	Group string `json:"group,omitempty"`
@@ -924,7 +952,6 @@ func (a *ArgoCDNetworkPolicySpec) IsEnabled() bool {
 // +k8s:openapi-gen=true
 // +kubebuilder:validation:XValidation:rule="!(has(self.sso) && has(self.oidcConfig))",message="spec.sso and spec.oidcConfig cannot both be set"
 type ArgoCDSpec struct {
-
 	// ArgoCDApplicationSet defines whether the Argo CD ApplicationSet controller should be installed.
 	ApplicationSet *ArgoCDApplicationSet `json:"applicationSet,omitempty"`
 
@@ -942,6 +969,9 @@ type ArgoCDSpec struct {
 
 	// Controller defines the Application Controller options for ArgoCD.
 	Controller ArgoCDApplicationControllerSpec `json:"controller,omitempty"`
+
+	// CommitServer defines the options for the ArgoCD Commit Server component.
+	CommitServer ArgoCDCommitServerSpec `json:"commitServer,omitempty"`
 
 	// DisableAdmin will disable the admin user.
 	DisableAdmin bool `json:"disableAdmin,omitempty"`
@@ -1071,6 +1101,9 @@ type ArgoCDSpec struct {
 	// Server defines the options for the ArgoCD Server component.
 	Server ArgoCDServerSpec `json:"server,omitempty"`
 
+	// SourceHydrator defines the options for the ArgoCD Source Hydrator component.
+	SourceHydrator ArgoCDSourceHydratorSpec `json:"sourceHydrator,omitempty"`
+
 	// SourceNamespaces defines the namespaces application resources are allowed to be created in
 	SourceNamespaces []string `json:"sourceNamespaces,omitempty"`
 
@@ -1125,6 +1158,9 @@ type ArgoCDSpec struct {
 	WebhookSecrets *ArgoCDWebhookSecretsSpec `json:"webhookSecrets,omitempty"`
 	// WebTerminalEnabled allows you to get a shell inside a running pod just like you would with kubectl exec
 	WebTerminalEnabled *bool `json:"webTerminalEnabled,omitempty"`
+
+	// Promoter defines the spec for the GitOps Promoter component
+	Promoter *PromoterSpec `json:"promoter,omitempty"`
 }
 
 // NamespaceManagement defines the namespace management settings
@@ -1296,6 +1332,15 @@ type ArgoCDStatus struct {
 	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="Server",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
 	Server string `json:"server,omitempty"`
 
+	// CommitServer is a simple, high-level summary of where the Argo CD Commit Server component is in its lifecycle.
+	// There are four possible server values:
+	// Pending: The Argo CD commit server component has been accepted by the Kubernetes system, but one or more of the required resources have not been created.
+	// Running: All of the required Pods for the Argo CD commit server component are in a Ready state.
+	// Failed: At least one of the  Argo CD commit server component Pods had a failure.
+	// Unknown: The state of the Argo CD commit server component could not be obtained.
+	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="CommitServer",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
+	CommitServer string `json:"commitServer,omitempty"`
+
 	// RepoTLSChecksum contains the SHA256 checksum of the latest known state of tls.crt and tls.key in the argocd-repo-server-tls secret.
 	RepoTLSChecksum string `json:"repoTLSChecksum,omitempty"`
 
@@ -1343,7 +1388,6 @@ type SSHHostsSpec struct {
 
 // WebhookServerSpec defines the options for the ApplicationSet Webhook Server component.
 type WebhookServerSpec struct {
-
 	// Host is the hostname to use for Ingress/Route resources.
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Host",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:fieldGroup:Server","urn:alm:descriptor:com.tectonic.ui:text"}
 	Host string `json:"host,omitempty"`
@@ -1377,8 +1421,18 @@ const (
 	AgentComponentTypeAgent AgentComponentType = "agent"
 )
 
-type ArgoCDAgentSpec struct {
+// PromoterComponentType is a type that represents the possible components for the gitops-promoter
+type PromoterComponentType string
 
+// Possible gitops-promoter component types
+const (
+	// PromoterComponentTypeControllerManager indicates that the component is the controller manager
+	PromoterComponentTypeControllerManager PromoterComponentType = "promoter-controller-manager"
+	// PromoterComponentTypeAPIServer indicates that the component is the api server
+	PromoterComponentTypeAPIServer PromoterComponentType = "promoter-apiserver"
+)
+
+type ArgoCDAgentSpec struct {
 	// Principal defines configurations for the Principal component of Argo CD Agent.
 	Principal *PrincipalSpec `json:"principal,omitempty"`
 
@@ -1387,7 +1441,6 @@ type ArgoCDAgentSpec struct {
 }
 
 type PrincipalSpec struct {
-
 	// Enabled is the flag to enable the Principal component during Argo CD installation. (optional, default `false`)
 	Enabled *bool `json:"enabled,omitempty"`
 
@@ -1456,7 +1509,6 @@ type PrincipalServerSpec struct {
 }
 
 type PrincipalRedisSpec struct {
-
 	// ServerAddress is the address of the Redis server to be used by the Principal component.
 	ServerAddress string `json:"serverAddress,omitempty"`
 
@@ -1465,7 +1517,6 @@ type PrincipalRedisSpec struct {
 }
 
 type PrincipalJWTSpec struct {
-
 	// InsecureGenerate is the flag to allow the principal to generate its own private key for signing JWT tokens (insecure).
 	InsecureGenerate *bool `json:"insecureGenerate,omitempty"`
 
@@ -1474,7 +1525,6 @@ type PrincipalJWTSpec struct {
 }
 
 type PrincipalNamespaceSpec struct {
-
 	// AllowedNamespaces is a list of namespaces the principal shall watch and process Argo CD resources in.
 	AllowedNamespaces []string `json:"allowedNamespaces,omitempty"`
 
@@ -1489,7 +1539,6 @@ type PrincipalNamespaceSpec struct {
 }
 
 type PrincipalResourceProxySpec struct {
-
 	// SecretName is the name of the secret containing the TLS certificate and key for the resource proxy.
 	SecretName string `json:"secretName,omitempty"`
 
@@ -1498,7 +1547,6 @@ type PrincipalResourceProxySpec struct {
 }
 
 type PrincipalTLSSpec struct {
-
 	// SecretName is The name of the secret containing the TLS certificate and key.
 	SecretName string `json:"secretName,omitempty"`
 
@@ -1528,7 +1576,6 @@ func (a *PrincipalSpec) IsEnabled() bool {
 }
 
 type AgentSpec struct {
-
 	// Enabled is the flag to enable the Agent component during Argo CD installation. (optional, default `false`)
 	Enabled *bool `json:"enabled,omitempty"`
 
@@ -1599,7 +1646,6 @@ func (d *DestinationBasedMappingSpec) IsCreateNamespaceEnabled() bool {
 }
 
 type AgentClientSpec struct {
-
 	// PrincipalServerAddress is the remote address of the principal server to connect to.
 	PrincipalServerAddress string `json:"principalServerAddress,omitempty"`
 
@@ -1620,13 +1666,11 @@ type AgentClientSpec struct {
 }
 
 type AgentRedisSpec struct {
-
 	// ServerAddress is the address of the Redis server to be used by the PrincAgentipal component.
 	ServerAddress string `json:"serverAddress,omitempty"`
 }
 
 type AgentTLSSpec struct {
-
 	// SecretName is the name of the secret containing the agent client TLS certificate
 	SecretName string `json:"secretName,omitempty"`
 
@@ -1643,12 +1687,7 @@ func (a *AgentSpec) IsEnabled() bool {
 
 // IsDeletionFinalizerPresent checks if the instance has deletion finalizer
 func (argocd *ArgoCD) IsDeletionFinalizerPresent() bool {
-	for _, finalizer := range argocd.GetFinalizers() {
-		if finalizer == common.ArgoCDDeletionFinalizer {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(argocd.GetFinalizers(), common.ArgoCDDeletionFinalizer)
 }
 
 // WantsAutoTLS returns true if:
@@ -1737,4 +1776,70 @@ func (r *ArgoCDRouteSpec) UseExternalCertificate() bool {
 		return true
 	}
 	return false
+}
+
+// PromoterSpec defines the desired state for the GitOps Promoter
+type PromoterSpec struct {
+	// Enabled defines whether gitops promoter controller should be deployed or not (will default to being disabled)
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// Image is the image to be used for the GitOps Promoter
+	Image string `json:"image,omitempty"`
+
+	// Env lets you specify the environment variables for the pods that run the controller
+	Env []corev1.EnvVar `json:"env,omitempty"`
+
+	// Resources defines the compute resources that are required for the pods running the controller
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// APIServer defines the configuration for the promoter's API server
+	APIServer *PromoterAPIServerSpec `json:"apiserver,omitempty"`
+
+	// Webhook defines the configuration for the Promoter's Controller Webhook
+	Webhook *PromoterControllerWebhookSpec `json:"webhook,omitempty"`
+
+	// ArgoCDUIExtensionEnabled defines whether the Argo CD UI extension is enabled
+	ArgoCDUIExtensionEnabled bool `json:"argoCDUIExtensionEnabled,omitempty"`
+}
+
+// PromoterAPIServerSpec defines the desired state for the GitOps Promoter's API server
+type PromoterAPIServerSpec struct {
+	// Enabled defines whether or not the API server should be deployed or not (will default to true if the promoter is enabled)
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// TLS defines the TLS settings for the API server
+	TLS *PromoterAPIServerTLSSpec `json:"tls,omitempty"`
+}
+
+// PromoterAPIServerTLSSpec defines the TLS options for the GitOps Promoter's API server
+type PromoterAPIServerTLSSpec struct {
+	// CertSecretName is the name of the secret holding the TLS cert to use for the API Server
+	CertSecretName string `json:"certSecretName,omitempty"`
+
+	// CABundleSecretName is the name of the secret holding the CA bundle for the API Server's API Service
+	CABundleSecretName string `json:"caSecretName,omitempty"`
+
+	// CABundleSecretKey is the name of the key that holds the CA bundle for the API Server's API Service (defaults to "ca.crt")
+	CABundleSecretKey string `json:"caSecretKey,omitempty"`
+}
+
+// PromoterControllerWebhookSpec defines the Webhook options for the GitOps Promoter's controller
+type PromoterControllerWebhookSpec struct {
+	// Enabled defines whether the webhook is enabled for the Promoter's controller (defaults to being disabled)
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// ServiceType defines what service type the webhook service will be. If none is provided defaults to ClusterIP
+	ServiceType string `json:"serviceType,omitempty"`
+}
+
+func (p *PromoterSpec) IsEnabled() bool {
+	return p != nil && p.Enabled != nil && *p.Enabled
+}
+
+func (p *PromoterAPIServerSpec) IsEnabled() bool {
+	return p == nil || p.Enabled == nil || (p.Enabled != nil && *p.Enabled)
+}
+
+func (p *PromoterControllerWebhookSpec) IsEnabled() bool {
+	return p != nil && p.Enabled != nil && *p.Enabled
 }

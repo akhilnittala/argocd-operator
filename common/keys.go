@@ -208,7 +208,10 @@ const (
 
 	// ArgoCDExtensionImageEnvName is the environment variable used to get the image
 	// to be used for the Argo-CD extension image
-	ArgoCDExtensionImageEnvName = "ARGOCD_EXTENSION_IMAGE"
+	ArgoCDRolloutsExtensionImageEnvName = "ROLLOUTS_EXTENSION_IMAGE"
+
+	// ArgoCDPromoterExtensionEnvName is the environment variable used to get the image for the GitOps Promoter Extension
+	ArgoCDPromoterExtensionImageEnvName = "PROMOTER_EXTENSION_IMAGE"
 
 	// ArgoCDRedisHAProxyImageEnvName is the environment variable used to get the image
 	// to used for the Redis HA Proxy container.
@@ -262,6 +265,12 @@ const (
 	// ArgoCDAgentClusterRoleEnvName is an environment variable to specify a custom cluster role for the agent component of Argo CD Agent
 	ArgoCDAgentClusterRoleEnvName = "AGENT_CLUSTER_ROLE"
 
+	// GitOpsPromoterControllerClusterRoleEnvName is an environment variable to specify a custom cluster role for the GitOps Promoter Controller
+	GitOpsPromoterControllerClusterRoleEnvName = "PROMOTER_CONTROLLER_CLUSTER_ROLE"
+
+	// GitOpsPromoterAPIServerClusterRoleEnvName is an environment variable to specify a custom cluster role for the GitOps Promoter API Server
+	GitOpsPromoterAPIServerClusterRoleEnvName = "PROMOTER_API_SERVER_CLUSTER_ROLE"
+
 	// ArgoCDDexSecretKey is used to reference Dex secret from Argo CD secret into Argo CD configmap
 	ArgoCDDexSecretKey = "oidc.dex.clientSecret" // #nosec G101
 
@@ -292,6 +301,15 @@ const (
 	// ArgoCDImagePullPolicyEnvName is the environment variable used to get the global image pull policy
 	// for all ArgoCD components managed by the operator.
 	ArgoCDImagePullPolicyEnvName = "IMAGE_PULL_POLICY"
+
+	// ArgoCDImagePullSecretPropagateLabel is the label applied to Secrets in the operator namespace
+	// that should be copied to all ArgoCD instance namespaces and referenced as imagePullSecrets.
+	ArgoCDImagePullSecretPropagateLabel = "operator.argoproj.io/propagate-image-pull-secret"
+
+	// ArgoCDImagePullSecretCopiedLabel marks a Secret as a copy of a propagated image pull secret.
+	// The value is the source secret name.
+	ArgoCDImagePullSecretCopiedLabel = "operator.argoproj.io/image-pull-secret-source"
+
 	// ArgoCDWebTerminalEnabledKey is the configuration key for enabling the web terminal.
 	ArgoCDWebTerminalEnabledKey = "exec.enabled"
 	// ArgoCDWebTerminalEnabledDefaultValue is the default value for enabling the web terminal.

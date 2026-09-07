@@ -37,9 +37,7 @@ import (
 )
 
 var _ = Describe("GitOps Operator Parallel E2E Tests", func() {
-
 	Context("1-044_validate_rollout_extension", func() {
-
 		var (
 			k8sClient client.Client
 			ctx       context.Context
@@ -53,7 +51,6 @@ var _ = Describe("GitOps Operator Parallel E2E Tests", func() {
 		})
 
 		It("verifies that enableRolloutsUI can be enabled/disabled on ArgoCD CR, and the server Deployment is updated accordingly", func() {
-
 			By("creating simple Argo CD instance enableRolloutsUI: true")
 			ns, cleanupFunc := fixture.CreateRandomE2ETestNamespaceWithCleanupFunc()
 			defer cleanupFunc()
@@ -89,7 +86,7 @@ var _ = Describe("GitOps Operator Parallel E2E Tests", func() {
 
 			Expect(initContainer.VolumeMounts).To(Equal([]corev1.VolumeMount{
 				{
-					Name:      "rollout-extensions",
+					Name:      "argo-cd-operator-ui-extensions",
 					MountPath: "/tmp/extensions/",
 				},
 				{
@@ -99,37 +96,37 @@ var _ = Describe("GitOps Operator Parallel E2E Tests", func() {
 			}))
 
 			Expect(*initContainer.SecurityContext).To(Equal(corev1.SecurityContext{
-				AllowPrivilegeEscalation: ptr.To(false),
+				AllowPrivilegeEscalation: new(false),
 				Capabilities: &corev1.Capabilities{
 					Drop: []corev1.Capability{
 						"ALL",
 					},
 				},
-				ReadOnlyRootFilesystem: ptr.To(true),
-				RunAsNonRoot:           ptr.To(true),
+				ReadOnlyRootFilesystem: new(true),
+				RunAsUser:              ptr.To(int64(1000)),
+				RunAsNonRoot:           new(true),
 				// RunAsUser:              ptr.To(int64(999)),
 				SeccompProfile: &corev1.SeccompProfile{
 					Type: corev1.SeccompProfileTypeRuntimeDefault,
 				},
 			}))
 
-			By("verifying argo cd server has expected rollout-extensions volume")
+			By("verifying argo cd server has expected extensions volume")
 			Expect(argoCDServer).Should(deploymentFixture.HaveSpecTemplateSpecVolume(corev1.Volume{
-				Name: "rollout-extensions",
+				Name: "argo-cd-operator-ui-extensions",
 				VolumeSource: corev1.VolumeSource{
 					EmptyDir: &corev1.EmptyDirVolumeSource{},
 				},
 			}))
 
-			By("verifying argocd-server container has volume mount to rollout-extensions")
+			By("verifying argocd-server container has volume mount to extensions")
 			container := deploymentFixture.GetTemplateSpecContainerByName("argocd-server", *argoCDServer)
 			Expect(container).ToNot(BeNil())
 
 			match := false
 			for _, volumeMount := range container.VolumeMounts {
-
 				if reflect.DeepEqual(volumeMount, corev1.VolumeMount{
-					Name:      "rollout-extensions",
+					Name:      "argo-cd-operator-ui-extensions",
 					MountPath: "/tmp/extensions/",
 				}) {
 					match = true
@@ -156,8 +153,7 @@ var _ = Describe("GitOps Operator Parallel E2E Tests", func() {
 			By("verifying rollout-extensions volume no longer exists")
 			match = false
 			for _, volume := range argoCDServer.Spec.Template.Spec.Volumes {
-
-				if volume.Name == "rollout-extensions" {
+				if volume.Name == "argo-cd-operator-ui-extensions" {
 					match = true
 				}
 			}
@@ -169,13 +165,11 @@ var _ = Describe("GitOps Operator Parallel E2E Tests", func() {
 
 			match = false
 			for _, volumeMount := range container.VolumeMounts {
-
-				if volumeMount.Name == "rollout-extensions" {
+				if volumeMount.Name == "argo-cd-operator-ui-extensions" {
 					match = true
 				}
 			}
 			Expect(match).To(BeFalse())
-
 		})
 	})
 })

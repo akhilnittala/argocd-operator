@@ -32,6 +32,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
+	promoter "github.com/argoproj-labs/gitops-promoter/api/v1alpha1"
+	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+
 	argoproj "github.com/argoproj-labs/argocd-operator/api/v1beta1"
 	"github.com/argoproj-labs/argocd-operator/common"
 	"github.com/argoproj-labs/argocd-operator/controllers/argoutil"
@@ -43,7 +46,7 @@ func createResources(cr *argoproj.ArgoCD, expect *assert.Assertions) *ReconcileA
 	resObjs := []client.Object{cr}
 	subresObjs := []client.Object{}
 	runtimeObjs := []runtime.Object{}
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 	cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
@@ -64,7 +67,6 @@ func createResources(cr *argoproj.ArgoCD, expect *assert.Assertions) *ReconcileA
 }
 
 func cleanupAllTokenTimers(r *ReconcileArgoCD) {
-
 	r.LocalUsers.lock.Lock()
 	defer r.LocalUsers.lock.Unlock()
 
@@ -112,7 +114,7 @@ func TestReconcileArgoCD_reconcileArgoLocalUsersCreate(t *testing.T) {
 	expect.NotEmpty(userSecret.Data["apiToken"])
 	expect.Equal("1h", string(userSecret.Data["tokenLifetime"]))
 
-	token, err := jwt.Parse(string(userSecret.Data["apiToken"]), func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.Parse(string(userSecret.Data["apiToken"]), func(token *jwt.Token) (any, error) {
 		return serverSecretKey, nil
 	})
 	expect.NoError(err)
@@ -159,7 +161,6 @@ func TestReconcileArgoCD_reconcileArgoLocalUsersCreate(t *testing.T) {
 
 	expect.Len(r.LocalUsers.tokenRenewalTimers, 1)
 	expect.True(timer == r.LocalUsers.tokenRenewalTimers[cr.Namespace+"/alice"]) // testing pointer equality
-
 }
 
 func TestReconcileArgoCD_reconcileArgoLocalUsersCreateWithDefaultTokenLifetime(t *testing.T) {
@@ -198,7 +199,7 @@ func TestReconcileArgoCD_reconcileArgoLocalUsersCreateWithDefaultTokenLifetime(t
 	expect.NotEmpty(userSecret.Data["apiToken"])
 	expect.Equal("0h", string(userSecret.Data["tokenLifetime"]))
 
-	token, err := jwt.Parse(string(userSecret.Data["apiToken"]), func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.Parse(string(userSecret.Data["apiToken"]), func(token *jwt.Token) (any, error) {
 		return serverSecretKey, nil
 	})
 	expect.NoError(err)
@@ -531,7 +532,7 @@ func TestReconcileArgoCD_reconcileArgoLocalUsersBasicAutoRenew(t *testing.T) {
 	expect.NotEmpty(userSecret.Data["apiToken"])
 	apiToken := string(userSecret.Data["apiToken"])
 
-	token, err := jwt.Parse(string(userSecret.Data["apiToken"]), func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.Parse(string(userSecret.Data["apiToken"]), func(token *jwt.Token) (any, error) {
 		return serverSecretKey, nil
 	})
 	expect.NoError(err)
@@ -562,7 +563,7 @@ func TestReconcileArgoCD_reconcileArgoLocalUsersBasicAutoRenew(t *testing.T) {
 	expect.NotNil(userSecret.Data["apiToken"])
 	expect.NotEqual(apiToken, string(userSecret.Data["apiToken"]))
 
-	token, err = jwt.Parse(string(userSecret.Data["apiToken"]), func(token *jwt.Token) (interface{}, error) {
+	token, err = jwt.Parse(string(userSecret.Data["apiToken"]), func(token *jwt.Token) (any, error) {
 		return serverSecretKey, nil
 	})
 	expect.NoError(err)
@@ -598,7 +599,7 @@ func TestReconcileArgoCD_reconcileArgoLocalUsersAutoRenewOnTokenNeverExpires(t *
 		{
 			Name:           "alice",
 			TokenLifetime:  "0s",
-			AutoRenewToken: boolPtr(true),
+			AutoRenewToken: new(true),
 		},
 	}
 
@@ -655,7 +656,7 @@ func TestReconcileArgoCD_reconcileArgoLocalUsersTurnOffAutoRenew(t *testing.T) {
 
 	// Turn autorenew off
 
-	cr.Spec.LocalUsers[0].AutoRenewToken = boolPtr(false)
+	cr.Spec.LocalUsers[0].AutoRenewToken = new(false)
 	expect.NoError(r.Update(context.TODO(), cr))
 	expect.NoError(r.reconcileLocalUsers(*cr))
 
@@ -674,7 +675,6 @@ func TestReconcileArgoCD_reconcileArgoLocalUsersTurnOffAutoRenew(t *testing.T) {
 	expect.Equal("false", string(userSecret.Data["autoRenew"]))
 	expect.NotEmpty(userSecret.Data["apiToken"])
 	expect.Equal(apiToken, string(userSecret.Data["apiToken"]))
-
 }
 
 func TestReconcileArgoCD_reconcileArgoLocalUsersTurnOnAutoRenew(t *testing.T) {
@@ -689,7 +689,7 @@ func TestReconcileArgoCD_reconcileArgoLocalUsersTurnOnAutoRenew(t *testing.T) {
 		{
 			Name:           "alice",
 			TokenLifetime:  "2s",
-			AutoRenewToken: boolPtr(false),
+			AutoRenewToken: new(false),
 		},
 	}
 	r := createResources(cr, expect)
@@ -721,7 +721,7 @@ func TestReconcileArgoCD_reconcileArgoLocalUsersTurnOnAutoRenew(t *testing.T) {
 
 	t.Log("Check the data in the argocd secret")
 
-	token, err := jwt.Parse(string(userSecret.Data["apiToken"]), func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.Parse(string(userSecret.Data["apiToken"]), func(token *jwt.Token) (any, error) {
 		return serverSecretKey, nil
 	})
 	expect.NoError(err)
@@ -742,7 +742,7 @@ func TestReconcileArgoCD_reconcileArgoLocalUsersTurnOnAutoRenew(t *testing.T) {
 
 	t.Log("Turn autorenew on")
 
-	cr.Spec.LocalUsers[0].AutoRenewToken = boolPtr(true)
+	cr.Spec.LocalUsers[0].AutoRenewToken = new(true)
 	expect.NoError(r.Update(context.TODO(), cr))
 	expect.NoError(r.reconcileLocalUsers(*cr))
 
@@ -790,7 +790,7 @@ func TestReconcileArgoCD_reconcileArgoLocalUsersTurnOnAutoRenew(t *testing.T) {
 	expect.NotNil(userSecret.Data["apiToken"])
 	expect.NotEqual(apiToken, string(userSecret.Data["apiToken"]))
 
-	token, err = jwt.Parse(string(userSecret.Data["apiToken"]), func(token *jwt.Token) (interface{}, error) {
+	token, err = jwt.Parse(string(userSecret.Data["apiToken"]), func(token *jwt.Token) (any, error) {
 		return serverSecretKey, nil
 	}, jwt.WithoutClaimsValidation())
 	expect.NoError(err)
@@ -831,7 +831,7 @@ func TestReconcileArgoCD_reconcileArgoLocalUsersTurnOnAutoRenewChangeTokenLifeti
 		{
 			Name:           "alice",
 			TokenLifetime:  "0s",
-			AutoRenewToken: boolPtr(false),
+			AutoRenewToken: new(false),
 		},
 	}
 	r := createResources(cr, expect)
@@ -857,7 +857,7 @@ func TestReconcileArgoCD_reconcileArgoLocalUsersTurnOnAutoRenewChangeTokenLifeti
 
 	// Turn autorenew on and change the token lifetime
 
-	cr.Spec.LocalUsers[0].AutoRenewToken = boolPtr(true)
+	cr.Spec.LocalUsers[0].AutoRenewToken = new(true)
 	cr.Spec.LocalUsers[0].TokenLifetime = "2s"
 	expect.NoError(r.Update(context.TODO(), cr))
 	expect.NoError(r.reconcileLocalUsers(*cr))
@@ -939,7 +939,7 @@ func TestReconcileArgoCD_reconcileArgoLocalUsersTurnOffAutoRenewChangeTokenLifet
 
 	// Turn autorenew off and change the token lifetime
 
-	cr.Spec.LocalUsers[0].AutoRenewToken = boolPtr(false)
+	cr.Spec.LocalUsers[0].AutoRenewToken = new(false)
 	cr.Spec.LocalUsers[0].TokenLifetime = "0s"
 	expect.NoError(r.Update(context.TODO(), cr))
 	expect.NoError(r.reconcileLocalUsers(*cr))
@@ -959,7 +959,6 @@ func TestReconcileArgoCD_reconcileArgoLocalUsersTurnOffAutoRenewChangeTokenLifet
 	expect.Equal("false", string(userSecret.Data["autoRenew"]))
 	expect.NotEmpty(userSecret.Data["apiToken"])
 	expect.NotEqual(apiToken, string(userSecret.Data["apiToken"]))
-
 }
 
 func TestReconcileArgoCD_reconcileArgoLocalUsersSetAPIKeyFalse(t *testing.T) {
@@ -1000,7 +999,7 @@ func TestReconcileArgoCD_reconcileArgoLocalUsersSetAPIKeyFalse(t *testing.T) {
 
 	// Change the ApiKey setting to false and reconcile again
 
-	cr.Spec.LocalUsers[0].ApiKey = boolPtr(false)
+	cr.Spec.LocalUsers[0].ApiKey = new(false)
 	expect.NoError(r.Update(context.TODO(), cr))
 	expect.NoError(r.reconcileLocalUsers(*cr))
 
@@ -1099,7 +1098,7 @@ func TestReconcileArgoCD_reconcileArgoLocalUsersRecreateTimer(t *testing.T) {
 	expect.NotNil(userSecret.Data["apiToken"])
 	expect.NotEqual(apiToken, string(userSecret.Data["apiToken"]))
 
-	token, err := jwt.Parse(string(userSecret.Data["apiToken"]), func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.Parse(string(userSecret.Data["apiToken"]), func(token *jwt.Token) (any, error) {
 		return serverSecretKey, nil
 	})
 	expect.NoError(err)
@@ -1192,7 +1191,7 @@ func TestReconcileLocalUser_SecretDoesNotExist_CreatesTokenAndSecret(t *testing.
 	expect.NotEmpty(userSecret.Data[localUserExpiresAt])
 
 	// Parse the JWT and verify its claims are correct
-	token, err := jwt.Parse(string(userSecret.Data[localUserApiToken]), func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.Parse(string(userSecret.Data[localUserApiToken]), func(token *jwt.Token) (any, error) {
 		return serverSecretKey, nil
 	})
 	expect.NoError(err)
@@ -1260,7 +1259,7 @@ func TestReconcileLocalUser_SecretDoesNotExist_EnabledFalse_CleansUp(t *testing.
 	user := argoproj.LocalUserSpec{
 		Name:          "alice",
 		TokenLifetime: "1h",
-		Enabled:       boolPtr(false),
+		Enabled:       new(false),
 	}
 
 	ctx := context.TODO()
@@ -1293,7 +1292,7 @@ func TestReconcileLocalUser_SecretDoesNotExist_ApiKeyFalse_CleansUp(t *testing.T
 	user := argoproj.LocalUserSpec{
 		Name:          "alice",
 		TokenLifetime: "1h",
-		ApiKey:        boolPtr(false),
+		ApiKey:        new(false),
 	}
 
 	ctx := context.TODO()
@@ -1333,7 +1332,7 @@ func TestReconcileLocalUser_SecretExists_EnabledSetToFalse_DeletesSecretAndToken
 	timer := r.LocalUsers.tokenRenewalTimers[cr.Namespace+"/alice"]
 
 	// Disable the user and reconcile again
-	user.Enabled = boolPtr(false)
+	user.Enabled = new(false)
 	expect.NoError(r.reconcileLocalUser(ctx, *cr, user))
 
 	// User secret should have been deleted
@@ -1375,7 +1374,7 @@ func TestReconcileLocalUser_SecretExists_ApiKeySetToFalse_DeletesSecretAndToken(
 	timer := r.LocalUsers.tokenRenewalTimers[cr.Namespace+"/alice"]
 
 	// Set apiKey to false and reconcile -- the API token is no longer needed
-	user.ApiKey = boolPtr(false)
+	user.ApiKey = new(false)
 	expect.NoError(r.reconcileLocalUser(ctx, *cr, user))
 
 	// User secret should have been deleted
@@ -1490,7 +1489,7 @@ func TestReconcileLocalUser_SecretExists_TokenExpired_AutoRenewTrue_RenewsToken(
 
 	// Manually set expAt to one hour in the past to simulate an expired token
 	expiredTime := time.Now().Add(-1 * time.Hour).Unix()
-	userSecret.Data[localUserExpiresAt] = []byte(fmt.Sprintf("%d", expiredTime))
+	userSecret.Data[localUserExpiresAt] = fmt.Appendf(nil, "%d", expiredTime)
 	expect.NoError(r.Update(ctx, &userSecret))
 
 	// Reconcile should detect the expiration and issue a new token
@@ -1533,7 +1532,7 @@ func TestReconcileLocalUser_SecretExists_AutoRenewChangedTrueToFalse_UpdatesSecr
 	timer := r.LocalUsers.tokenRenewalTimers[cr.Namespace+"/alice"]
 
 	// Turn off auto-renew
-	user.AutoRenewToken = boolPtr(false)
+	user.AutoRenewToken = new(false)
 	expect.NoError(r.reconcileLocalUser(ctx, *cr, user))
 
 	// The secret's autoRenew field should be updated, but the token itself
@@ -1562,7 +1561,7 @@ func TestReconcileLocalUser_SecretExists_AutoRenewChangedFalseToTrue_UpdatesSecr
 	user := argoproj.LocalUserSpec{
 		Name:           "alice",
 		TokenLifetime:  "1h",
-		AutoRenewToken: boolPtr(false),
+		AutoRenewToken: new(false),
 	}
 	expect.NoError(r.reconcileLocalUser(ctx, *cr, user))
 
@@ -1573,7 +1572,7 @@ func TestReconcileLocalUser_SecretExists_AutoRenewChangedFalseToTrue_UpdatesSecr
 	expect.Empty(r.LocalUsers.tokenRenewalTimers)
 
 	// Turn on auto-renew
-	user.AutoRenewToken = boolPtr(true)
+	user.AutoRenewToken = new(true)
 	expect.NoError(r.reconcileLocalUser(ctx, *cr, user))
 
 	// The secret's autoRenew field should be updated, but the token itself
@@ -1679,7 +1678,7 @@ func TestReconcileLocalUser_SecretDoesNotExist_AutoRenewFalse_NoTimer(t *testing
 	user := argoproj.LocalUserSpec{
 		Name:           "alice",
 		TokenLifetime:  "1h",
-		AutoRenewToken: boolPtr(false),
+		AutoRenewToken: new(false),
 	}
 	expect.NoError(r.reconcileLocalUser(ctx, *cr, user))
 
@@ -1767,7 +1766,7 @@ func TestReconcileLocalUser_SecretExists_TokenExpired_AutoRenewFalse_DoesNotRene
 	user := argoproj.LocalUserSpec{
 		Name:           "alice",
 		TokenLifetime:  "1h",
-		AutoRenewToken: boolPtr(false),
+		AutoRenewToken: new(false),
 	}
 	expect.NoError(r.reconcileLocalUser(ctx, *cr, user))
 
@@ -1778,7 +1777,7 @@ func TestReconcileLocalUser_SecretExists_TokenExpired_AutoRenewFalse_DoesNotRene
 
 	// Manually set expAt to one hour in the past to simulate an expired token
 	expiredTime := time.Now().Add(-1 * time.Hour).Unix()
-	userSecret.Data[localUserExpiresAt] = []byte(fmt.Sprintf("%d", expiredTime))
+	userSecret.Data[localUserExpiresAt] = fmt.Appendf(nil, "%d", expiredTime)
 	expect.NoError(r.Update(ctx, &userSecret))
 
 	// Reconcile should leave the expired token as-is because autoRenew is false

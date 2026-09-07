@@ -30,13 +30,16 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	testclient "k8s.io/client-go/kubernetes/fake"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1 "k8s.io/api/apps/v1"
+
+	promoter "github.com/argoproj-labs/gitops-promoter/api/v1alpha1"
+	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 
 	argoproj "github.com/argoproj-labs/argocd-operator/api/v1beta1"
 	"github.com/argoproj-labs/argocd-operator/common"
@@ -53,7 +56,7 @@ func TestReconcileArgoCD_reconcileTLSCerts(t *testing.T) {
 	resObjs := []client.Object{a}
 	subresObjs := []client.Object{a}
 	runtimeObjs := []runtime.Object{}
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 	cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -81,7 +84,7 @@ func TestReconcileArgoCD_reconcileTLSCerts_configMapUpdate(t *testing.T) {
 	resObjs := []client.Object{a}
 	subresObjs := []client.Object{a}
 	runtimeObjs := []runtime.Object{}
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 	cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -129,7 +132,7 @@ func TestReconcileArgoCD_reconcileRedisHAHealthConfigMap(t *testing.T) {
 	resObjs := []client.Object{cr}
 	subresObjs := []client.Object{}
 	runtimeObjs := []runtime.Object{}
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 	cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -173,7 +176,7 @@ func TestReconcileArgoCD_reconcileRedisHAConfigMap(t *testing.T) {
 	resObjs := []client.Object{cr}
 	subresObjs := []client.Object{}
 	runtimeObjs := []runtime.Object{}
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 	cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -211,7 +214,7 @@ func TestReconcileArgoCD_reconcileTLSCerts_withInitialCertsUpdate(t *testing.T) 
 	resObjs := []client.Object{a}
 	subresObjs := []client.Object{a}
 	runtimeObjs := []runtime.Object{}
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 	cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -367,7 +370,7 @@ func TestReconcileArgoCD_reconcileArgoConfigMap(t *testing.T) {
 		resObjs := []client.Object{a}
 		subresObjs := []client.Object{a}
 		runtimeObjs := []runtime.Object{}
-		sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+		sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 		cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 		r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -397,7 +400,7 @@ func TestReconcileArgoCD_reconcileEmptyArgoConfigMap(t *testing.T) {
 	resObjs := []client.Object{a}
 	subresObjs := []client.Object{a}
 	runtimeObjs := []runtime.Object{}
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 	cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -434,7 +437,7 @@ func TestReconcileArgoCD_reconcileArgoConfigMap_withDisableAdmin(t *testing.T) {
 	resObjs := []client.Object{a}
 	subresObjs := []client.Object{a}
 	runtimeObjs := []runtime.Object{}
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 	cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -464,7 +467,7 @@ func TestReconcileArgoCD_reconcileArgoConfigMap_withDexConnector(t *testing.T) {
 			SigningKeys string `yaml:"signingKeys"`
 		}
 
-		dexCfg := map[string]interface{}{
+		dexCfg := map[string]any{
 			"expiry": expiry{
 				IdTokens:    "1hr",
 				SigningKeys: "12hr",
@@ -529,7 +532,7 @@ func TestReconcileArgoCD_reconcileArgoConfigMap_withDexConnector(t *testing.T) {
 			resObjs := []client.Object{a, sa, secret}
 			subresObjs := []client.Object{a}
 			runtimeObjs := []runtime.Object{}
-			sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+			sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 			cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 			r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -551,7 +554,7 @@ func TestReconcileArgoCD_reconcileArgoConfigMap_withDexConnector(t *testing.T) {
 				t.Fatal("reconcileArgoConfigMap with dex failed")
 			}
 
-			m := make(map[string]interface{})
+			m := make(map[string]any)
 			err = yaml.Unmarshal([]byte(dex), &m)
 			assert.NoError(t, err, fmt.Sprintf("failed to unmarshal %s", dex))
 
@@ -559,13 +562,13 @@ func TestReconcileArgoCD_reconcileArgoConfigMap_withDexConnector(t *testing.T) {
 			if !ok {
 				t.Fatal("no connectors found in dex.config")
 			}
-			dexConnector := connectors.([]interface{})[0].(map[interface{}]interface{})
+			dexConnector := connectors.([]any)[0].(map[any]any)
 			config := dexConnector["config"]
-			assert.Equal(t, config.(map[interface{}]interface{})["clientID"], "system:serviceaccount:argocd:argocd-argocd-dex-server")
+			assert.Equal(t, config.(map[any]any)["clientID"], "system:serviceaccount:argocd:argocd-argocd-dex-server")
 
 			// verify that the dex config in the CR matches the config from the argocd-cm
 			if a.Spec.SSO.Dex.Config != "" {
-				expectedCfg := make(map[string]interface{})
+				expectedCfg := make(map[string]any)
 				expectedCfgStr, err := r.getOpenShiftDexConfig(a)
 				assert.NoError(t, err)
 
@@ -575,7 +578,6 @@ func TestReconcileArgoCD_reconcileArgoConfigMap_withDexConnector(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func TestReconcileArgoCD_reconcileArgoConfigMap_withDexDisabled(t *testing.T) {
@@ -595,11 +597,10 @@ func TestReconcileArgoCD_reconcileArgoConfigMap_withDexDisabled(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-
 			resObjs := []client.Object{test.argoCD}
 			subresObjs := []client.Object{test.argoCD}
 			runtimeObjs := []runtime.Object{}
-			sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+			sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 			cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 			r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -661,7 +662,7 @@ func TestReconcileArgoCD_reconcileArgoConfigMap_dexConfigDeletedwhenDexDisabled(
 			resObjs := []client.Object{test.argoCD, sa, secret}
 			subresObjs := []client.Object{test.argoCD}
 			runtimeObjs := []runtime.Object{}
-			sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+			sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 			cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 			r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -716,7 +717,7 @@ func TestReconcileArgoCD_reconcileArgoConfigMap_withKustomizeVersions(t *testing
 	resObjs := []client.Object{a}
 	subresObjs := []client.Object{a}
 	runtimeObjs := []runtime.Object{}
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 	cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -744,7 +745,7 @@ func TestReconcileArgoCD_reconcileGPGKeysConfigMap(t *testing.T) {
 	resObjs := []client.Object{a}
 	subresObjs := []client.Object{a}
 	runtimeObjs := []runtime.Object{}
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 	cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -767,7 +768,7 @@ func TestReconcileArgoCD_reconcileArgoConfigMap_withResourceTrackingMethod(t *te
 	resObjs := []client.Object{a}
 	subresObjs := []client.Object{a}
 	runtimeObjs := []runtime.Object{}
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 	cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -847,7 +848,6 @@ func TestReconcileArgoCD_reconcileArgoConfigMap_withResourceTrackingMethod(t *te
 		assert.True(t, ok)
 		assert.Equal(t, argoproj.ResourceTrackingMethodAnnotation.String(), rtm)
 	})
-
 }
 
 func TestReconcileArgoCD_reconcileArgoConfigMap_withResourceInclusions(t *testing.T) {
@@ -862,7 +862,7 @@ func TestReconcileArgoCD_reconcileArgoConfigMap_withResourceInclusions(t *testin
 	resObjs := []client.Object{a}
 	subresObjs := []client.Object{a}
 	runtimeObjs := []runtime.Object{}
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 	cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -893,14 +893,12 @@ func TestReconcileArgoCD_reconcileArgoConfigMap_withResourceInclusions(t *testin
 	if c := cm.Data["resource.inclusions"]; c != updatedCustomizations {
 		t.Fatalf("reconcileArgoConfigMap failed got %q, want %q", c, updatedCustomizations)
 	}
-
 }
 
 func TestReconcileArgoCD_reconcileArgoConfigMap_withNewResourceCustomizations(t *testing.T) {
 	logf.SetLogger(ZapLogger(true))
 
-	desiredIgnoreDifferenceCustomization :=
-		`jqpathexpressions:
+	desiredIgnoreDifferenceCustomization := `jqpathexpressions:
 - a
 - b
 jsonpointers:
@@ -982,7 +980,7 @@ managedfieldsmanagers:
 	resObjs := []client.Object{a}
 	subresObjs := []client.Object{a}
 	runtimeObjs := []runtime.Object{}
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 	cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -1020,7 +1018,7 @@ func TestReconcileArgoCD_reconcileArgoConfigMap_withExtraConfig(t *testing.T) {
 	resObjs := []client.Object{a}
 	subresObjs := []client.Object{a}
 	runtimeObjs := []runtime.Object{}
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 	cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -1096,7 +1094,6 @@ func TestReconcileArgoCD_reconcileArgoConfigMap_withExtraConfig(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, cm.Data["admin.enabled"], "false")
-
 }
 
 func TestReconcileArgoCD_reconcileArgoConfigMap_withRespectRBAC(t *testing.T) {
@@ -1108,7 +1105,7 @@ func TestReconcileArgoCD_reconcileArgoConfigMap_withRespectRBAC(t *testing.T) {
 	resObjs := []client.Object{a}
 	subresObjs := []client.Object{a}
 	runtimeObjs := []runtime.Object{}
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 	cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -1151,7 +1148,7 @@ func TestReconcileArgoCD_reconcileArgoConfigMap_withLocalUsers(t *testing.T) {
 	resObjs := []client.Object{a}
 	subresObjs := []client.Object{a}
 	runtimeObjs := []runtime.Object{}
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 	cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -1177,7 +1174,7 @@ func TestReconcileArgoCD_reconcileArgoConfigMap_withLocalUsers(t *testing.T) {
 	a.Spec.LocalUsers = []argoproj.LocalUserSpec{
 		{
 			Name:    "alice",
-			Enabled: boolPtr(false),
+			Enabled: new(false),
 		},
 	}
 
@@ -1201,16 +1198,16 @@ func TestReconcileArgoCD_reconcileArgoConfigMap_withLocalUsers_extraConfigOverri
 	resObjs := []client.Object{a}
 	subresObjs := []client.Object{a}
 	runtimeObjs := []runtime.Object{}
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 	cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
 	a.Spec.LocalUsers = []argoproj.LocalUserSpec{
 		{
 			Name:    "alice",
-			ApiKey:  boolPtr(true),
+			ApiKey:  new(true),
 			Login:   false,
-			Enabled: boolPtr(false),
+			Enabled: new(false),
 		},
 	}
 
@@ -1234,9 +1231,9 @@ func TestReconcileArgoCD_reconcileArgoConfigMap_withLocalUsers_extraConfigOverri
 	a.Spec.LocalUsers = []argoproj.LocalUserSpec{
 		{
 			Name:    "alice",
-			ApiKey:  boolPtr(true),
+			ApiKey:  new(true),
 			Login:   false,
-			Enabled: boolPtr(false),
+			Enabled: new(false),
 		},
 	}
 
@@ -1264,7 +1261,7 @@ func Test_reconcileRBAC(t *testing.T) {
 	resObjs := []client.Object{a}
 	subresObjs := []client.Object{a}
 	runtimeObjs := []runtime.Object{}
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 	cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -1326,7 +1323,6 @@ func Test_reconcileRBAC(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, cmRbacScopes, cm.Data["scopes"])
 	assert.Equal(t, rbacScopes, *a.Spec.RBAC.Scopes)
-
 }
 
 func Test_modifyOwnerReferenceIfNeeded(t *testing.T) {
@@ -1334,7 +1330,7 @@ func Test_modifyOwnerReferenceIfNeeded(t *testing.T) {
 	uid := uuid.NewUUID()
 	a.UID = uid
 
-	scheme := makeTestReconcilerScheme(argoproj.AddToScheme)
+	scheme := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 	cl := makeTestReconcilerClient(scheme, nil, nil, nil)
 	r := makeTestReconciler(cl, scheme, testclient.NewSimpleClientset())
 
@@ -1428,7 +1424,7 @@ func Test_modifyOwnerReferenceIfNeeded(t *testing.T) {
 				Kind:       "ConfigMap",
 				Name:       "something",
 				UID:        "123",
-				Controller: ptr.To(false),
+				Controller: new(false),
 			},
 		}
 
@@ -1495,7 +1491,7 @@ func TestReconcileArgoCD_reconcileArgoConfigMap_withInstallationID(t *testing.T)
 	resObjs := []client.Object{a}
 	subresObjs := []client.Object{a}
 	runtimeObjs := []runtime.Object{}
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 	cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -1513,7 +1509,7 @@ func TestReconcileArgoCD_reconcileArgoConfigMap_withInstallationID(t *testing.T)
 	// Verify installationID is set as a top-level key
 	assert.Equal(t, "test-id", cm.Data[common.ArgoCDKeyInstallationID])
 
-	//Test updating installationID
+	// Test updating installationID
 	a.Spec.InstallationID = "test-id-2"
 	err = r.reconcileArgoConfigMap(a)
 	assert.NoError(t, err)
@@ -1563,7 +1559,7 @@ func TestReconcileArgoCD_reconcileArgoConfigMap_withMultipleInstances(t *testing
 	resObjs := []client.Object{argocd1, argocd2}
 	subresObjs := []client.Object{argocd1, argocd2}
 	runtimeObjs := []runtime.Object{}
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 	cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -1612,7 +1608,7 @@ func TestReconcileArgoCD_RBACPolicyWithLogsPermissions(t *testing.T) {
 	resObjs := []client.Object{a, argocdCM}
 	subresObjs := []client.Object{a}
 	runtimeObjs := []runtime.Object{}
-	sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+	sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 	cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 	r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -1847,7 +1843,7 @@ func TestReconcileArgoCD_reconcileArgoCmdParamsConfigMap(t *testing.T) {
 			resObjs := []client.Object{a}
 			subresObjs := []client.Object{a}
 			runtimeObjs := []runtime.Object{}
-			sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+			sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 			cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 			r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -1965,7 +1961,7 @@ func TestReconcileArgoCD_reconcileArgoCmdParamsConfigMap_tokenRefStrictDefault(t
 			resObjs = append(resObjs, tt.extraNamespaces...)
 			subresObjs := []client.Object{a}
 			runtimeObjs := []runtime.Object{}
-			sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+			sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 			cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 			r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -1998,7 +1994,7 @@ func TestReconcileArgoCD_reconcileArgoConfigMap_sensitiveAnnotations(t *testing.
 		resObjs := []client.Object{a}
 		subresObjs := []client.Object{a}
 		runtimeObjs := []runtime.Object{}
-		sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+		sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 		cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 		r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -2024,7 +2020,7 @@ func TestReconcileArgoCD_reconcileArgoConfigMap_sensitiveAnnotations(t *testing.
 		resObjs := []client.Object{a}
 		subresObjs := []client.Object{a}
 		runtimeObjs := []runtime.Object{}
-		sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+		sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 		cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 		r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -2049,7 +2045,7 @@ func TestReconcileArgoCD_reconcileArgoConfigMap_sensitiveAnnotations(t *testing.
 		resObjs := []client.Object{a}
 		subresObjs := []client.Object{a}
 		runtimeObjs := []runtime.Object{}
-		sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+		sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 		cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 		r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -2092,7 +2088,7 @@ func TestReconcileArgoCD_reconcileArgoConfigMap_sensitiveAnnotations(t *testing.
 		resObjs := []client.Object{a}
 		subresObjs := []client.Object{a}
 		runtimeObjs := []runtime.Object{}
-		sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+		sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 		cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 		r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -2121,7 +2117,7 @@ func TestReconcileArgoCD_reconcileArgoConfigMap_sensitiveAnnotations(t *testing.
 		resObjs := []client.Object{a}
 		subresObjs := []client.Object{a}
 		runtimeObjs := []runtime.Object{}
-		sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+		sch := makeTestReconcilerScheme(argoproj.AddToScheme, promoter.AddToScheme, apiregistrationv1.AddToScheme)
 		cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
 		r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
 
@@ -2137,5 +2133,121 @@ func TestReconcileArgoCD_reconcileArgoConfigMap_sensitiveAnnotations(t *testing.
 		assert.Equal(t, "some.other/annotation,openshift.io/token-secret.value",
 			cm.Data[common.ArgoCDKeyResourceSensitiveMaskAnnotations],
 			"token annotation should not be duplicated")
+	})
+}
+
+func TestReconcileArgoCD_reconcileCAConfigMap(t *testing.T) {
+	logf.SetLogger(ZapLogger(true))
+
+	t.Run("creates ConfigMap with both tls.crt and ca.crt keys", func(t *testing.T) {
+		a := makeTestArgoCD()
+
+		caSecret, err := newCASecret(a)
+		require.NoError(t, err)
+
+		resObjs := []client.Object{a, caSecret}
+		subresObjs := []client.Object{a}
+		runtimeObjs := []runtime.Object{}
+		sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+		cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
+		r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
+
+		err = r.reconcileCAConfigMap(a)
+		require.NoError(t, err)
+
+		cm := &corev1.ConfigMap{}
+		err = r.Get(context.TODO(), types.NamespacedName{
+			Name:      getCAConfigMapName(a),
+			Namespace: a.Namespace,
+		}, cm)
+		require.NoError(t, err)
+
+		assert.Contains(t, cm.Data, common.ArgoCDKeyTLSCert, "ConfigMap should have tls.crt key")
+		assert.Contains(t, cm.Data, common.ArgoCDKeyTLSCACert, "ConfigMap should have ca.crt key")
+		assert.Equal(t, string(caSecret.Data[corev1.TLSCertKey]), cm.Data[common.ArgoCDKeyTLSCert])
+		assert.Equal(t, string(caSecret.Data[corev1.ServiceAccountRootCAKey]), cm.Data[common.ArgoCDKeyTLSCACert])
+	})
+
+	t.Run("updates ConfigMap when ca.crt key is missing", func(t *testing.T) {
+		a := makeTestArgoCD()
+
+		caSecret, err := newCASecret(a)
+		require.NoError(t, err)
+
+		// Create ConfigMap with only tls.crt + an extra key (simulating pre-fix state with custom data)
+		oldCM := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      getCAConfigMapName(a),
+				Namespace: a.Namespace,
+			},
+			Data: map[string]string{
+				common.ArgoCDKeyTLSCert: "existing-tls",
+				"someOtherKey":          "someValue",
+			},
+		}
+
+		resObjs := []client.Object{a, caSecret, oldCM}
+		subresObjs := []client.Object{a}
+		runtimeObjs := []runtime.Object{}
+		sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+		cl := makeTestReconcilerClient(sch, resObjs, subresObjs, runtimeObjs)
+		r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
+
+		err = r.reconcileCAConfigMap(a)
+		require.NoError(t, err)
+
+		cm := &corev1.ConfigMap{}
+		err = r.Get(context.TODO(), types.NamespacedName{
+			Name:      getCAConfigMapName(a),
+			Namespace: a.Namespace,
+		}, cm)
+		require.NoError(t, err)
+
+		assert.Equal(t, "existing-tls", cm.Data[common.ArgoCDKeyTLSCert], "existing tls.crt should be preserved")
+		assert.Contains(t, cm.Data, common.ArgoCDKeyTLSCACert, "ConfigMap should now have ca.crt key added")
+		assert.Equal(t, string(caSecret.Data[corev1.ServiceAccountRootCAKey]), cm.Data[common.ArgoCDKeyTLSCACert])
+		assert.Contains(t, cm.Data, "someOtherKey", "existing keys should be preserved")
+		assert.Equal(t, "someValue", cm.Data["someOtherKey"], "existing key values should be preserved")
+	})
+
+	t.Run("no-op when both keys are already present", func(t *testing.T) {
+		a := makeTestArgoCD()
+
+		caSecret, err := newCASecret(a)
+		require.NoError(t, err)
+
+		// Create ConfigMap with sentinel values (simulating post-fix state)
+		existingCM := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      getCAConfigMapName(a),
+				Namespace: a.Namespace,
+			},
+			Data: map[string]string{
+				common.ArgoCDKeyTLSCert:   "sentinel-tls",
+				common.ArgoCDKeyTLSCACert: "sentinel-ca",
+			},
+		}
+
+		resObjs := []client.Object{a, caSecret, existingCM}
+		subresObjs := []client.Object{a}
+		runtimeObjs := []runtime.Object{}
+		sch := makeTestReconcilerScheme(argoproj.AddToScheme)
+		cl := fake.NewClientBuilder().WithScheme(sch).WithObjects(resObjs...).WithStatusSubresource(subresObjs...).WithRuntimeObjects(runtimeObjs...).WithInterceptorFuncs(interceptor.Funcs{Update: func(ctx context.Context, client client.WithWatch, obj client.Object, opts ...client.UpdateOption) error {
+			return fmt.Errorf("unexpected Update call to configmaps")
+		}}).Build()
+		r := makeTestReconciler(cl, sch, testclient.NewSimpleClientset())
+
+		err = r.reconcileCAConfigMap(a)
+		require.NoError(t, err)
+
+		cm := &corev1.ConfigMap{}
+		err = r.Get(context.TODO(), types.NamespacedName{
+			Name:      getCAConfigMapName(a),
+			Namespace: a.Namespace,
+		}, cm)
+		require.NoError(t, err)
+
+		assert.Equal(t, "sentinel-tls", cm.Data[common.ArgoCDKeyTLSCert], "existing tls.crt should be preserved unchanged")
+		assert.Equal(t, "sentinel-ca", cm.Data[common.ArgoCDKeyTLSCACert], "existing ca.crt should be preserved unchanged")
 	})
 }

@@ -25,7 +25,7 @@ import (
 
 const (
 	DefaultImageUpdaterImage      = "quay.io/argoprojlabs/argocd-image-updater"
-	DefaultImageUpdaterTag        = "v1.2.1"
+	DefaultImageUpdaterTag        = "v1.3.0"
 	ArgocdImageUpdaterConfigCM    = "argocd-image-updater-config"
 	ArgocdImageUpdaterSSHConfigCM = "argocd-image-updater-ssh-config"
 	ArgocdImageUpdaterSecret      = "argocd-image-updater-secret" // #nosec G101
@@ -60,11 +60,8 @@ func (r *ReconcileArgoCD) reconcileImageUpdaterControllerEnabled(cr *argoproj.Ar
 	//   - "ns1,ns2,...": watches specific namespaces.
 	//     Base role in cr.Namespace + manager Role in each listed namespace.
 	watchNamespaces := ""
-	for _, env := range cr.Spec.ImageUpdater.Env {
-		if env.Name == "IMAGE_UPDATER_WATCH_NAMESPACES" {
-			watchNamespaces = strings.TrimSpace(env.Value)
-			break
-		}
+	if env := argoutil.EnvGet(cr.Spec.ImageUpdater.Env, "IMAGE_UPDATER_WATCH_NAMESPACES"); env != nil {
+		watchNamespaces = strings.TrimSpace(env.Value)
 	}
 
 	// When the mode is not cluster-scoped, remove any ClusterRole/ClusterRoleBinding that may
@@ -133,7 +130,7 @@ func (r *ReconcileArgoCD) reconcileImageUpdaterControllerEnabled(cr *argoproj.Ar
 				return err
 			}
 		}
-		for _, ns := range strings.Split(watchNamespaces, ",") {
+		for ns := range strings.SplitSeq(watchNamespaces, ",") {
 			ns = strings.TrimSpace(ns)
 			if ns == "" {
 				continue
@@ -155,7 +152,7 @@ func (r *ReconcileArgoCD) reconcileImageUpdaterControllerEnabled(cr *argoproj.Ar
 	// Remove per-namespace Roles/RoleBindings for namespaces no longer in the watch list.
 	desiredNamespaces := map[string]struct{}{}
 	if watchNamespaces != "" && watchNamespaces != "*" {
-		for _, ns := range strings.Split(watchNamespaces, ",") {
+		for ns := range strings.SplitSeq(watchNamespaces, ",") {
 			if ns = strings.TrimSpace(ns); ns != "" {
 				desiredNamespaces[ns] = struct{}{}
 			}
@@ -329,17 +326,45 @@ func (r *ReconcileArgoCD) reconcileImageUpdaterServiceAccount(cr *argoproj.ArgoC
 			return nil, err
 		}
 
+		if !IsOpenShiftCluster() {
+			refs, err := r.getImagePullSecretRefs(cr)
+			if err != nil {
+				return nil, err
+			}
+			sa.ImagePullSecrets = refs
+		}
 		argoutil.LogResourceCreation(log, sa)
-		err := r.Create(context.TODO(), sa)
+		err = r.Create(context.TODO(), sa)
 		if err != nil {
 			return nil, err
 		}
+		return sa, nil
 	}
 
 	// SA exists but shouldn't, so it should be deleted
 	if !cr.Spec.ImageUpdater.Enabled {
 		argoutil.LogResourceDeletion(log, sa, "image updater is disabled")
 		return nil, r.Delete(context.TODO(), sa)
+	}
+
+	// On OpenShift the platform injects dockercfg secrets into SAs;
+	// do not touch ImagePullSecrets to avoid clobbering them.
+	if !IsOpenShiftCluster() {
+		desired, err := r.getImagePullSecretRefs(cr)
+		if err != nil {
+			return nil, err
+		}
+		existing := sa.ImagePullSecrets
+		if existing == nil {
+			existing = []corev1.LocalObjectReference{}
+		}
+		if !reflect.DeepEqual(existing, desired) {
+			sa.ImagePullSecrets = desired
+			argoutil.LogResourceUpdate(log, sa, "imagePullSecrets changed")
+			if err := r.Update(context.TODO(), sa); err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	return sa, nil
@@ -551,7 +576,7 @@ func (r *ReconcileArgoCD) reconcileImageUpdaterDeployment(cr *argoproj.ArgoCD, s
 
 	podSpec := &desiredDeployment.Spec.Template.Spec
 	podSpec.SecurityContext = &corev1.PodSecurityContext{
-		RunAsNonRoot: boolPtr(true),
+		RunAsNonRoot: new(true),
 	}
 	AddSeccompProfileForOpenShift(r.Client, podSpec)
 	podSpec.ServiceAccountName = sa.Name
@@ -570,7 +595,7 @@ func (r *ReconcileArgoCD) reconcileImageUpdaterDeployment(cr *argoproj.ArgoCD, s
 			Name: "image-updater-conf",
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
-					Optional: boolPtr(true),
+					Optional: new(true),
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: ArgocdImageUpdaterConfigCM,
 					},
@@ -591,7 +616,7 @@ func (r *ReconcileArgoCD) reconcileImageUpdaterDeployment(cr *argoproj.ArgoCD, s
 			Name: "ssh-known-hosts",
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
-					Optional: boolPtr(true),
+					Optional: new(true),
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: "argocd-ssh-known-hosts-cm",
 					},
@@ -602,7 +627,7 @@ func (r *ReconcileArgoCD) reconcileImageUpdaterDeployment(cr *argoproj.ArgoCD, s
 			Name: "ssh-config",
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
-					Optional: boolPtr(true),
+					Optional: new(true),
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: ArgocdImageUpdaterSSHConfigCM,
 					},
@@ -614,7 +639,7 @@ func (r *ReconcileArgoCD) reconcileImageUpdaterDeployment(cr *argoproj.ArgoCD, s
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName: "ssh-git-creds",
-					Optional:   boolPtr(true),
+					Optional:   new(true),
 				},
 			},
 		},
