@@ -79,10 +79,10 @@ const (
 	ArgoCDDefaultApplicationInstanceLabelKey = "app.kubernetes.io/instance"
 
 	// ArgoCDDefaultArgoImage is the ArgoCD container image to use when not specified.
-	ArgoCDDefaultArgoImage = "quay.io/nittalaakhil/openshift-gitops-operator"
+	ArgoCDDefaultArgoImage = "quay.io/argoproj/argocd"
 
 	// ArgoCDDefaultArgoVersion is the Argo CD container image digest to use when version not specified.
-	ArgoCDDefaultArgoVersion = "sha256:6d7a7b9dd69a6b62ce4762d37e5b01119326a2dbd31b138b22fa4faab0d00a5f" // v3.5.2
+	ArgoCDDefaultArgoVersion = "sha256:e2aadfae709d904e87f46ba4aa49601d827b3022db22cd4d03aae816a2e7097b" // v3.5.2
 
 	// ArgoCDDefaultBackupKeyLength is the length of the generated default backup key.
 	ArgoCDDefaultBackupKeyLength = 32
@@ -113,7 +113,7 @@ const (
 	ArgoCDDefaultDexConfig = ""
 
 	// ArgoCDDefaultDexImage is the Dex container image to use when not specified.
-	ArgoCDDefaultDexImage = "quay.io/nittalaakhil/openshift-gitops-operator"
+	ArgoCDDefaultDexImage = "ghcr.io/dexidp/dex"
 
 	// ArgoCDDefaultDexOAuthRedirectPath is the default path to use for the OAuth Redirect URI.
 	ArgoCDDefaultDexOAuthRedirectPath = "/api/dex/callback"
@@ -139,7 +139,7 @@ const (
 	ArgoCDDexServerTokenRenewalThresholdPercent int64 = 33
 
 	// ArgoCDDefaultDexVersion is the Dex container image tag to use when not specified.
-	ArgoCDDefaultDexVersion = "sha256:99242863b134bf6ad480f5e204ab6cba39080f05e6138e01b110eda4ad2b9f4b" // v2.45.1
+	ArgoCDDefaultDexVersion = "sha256:f5d77499df7ea3ff0bdc5f9e218e4be8fac3b91a1b29b64a7158a5876850fb20" // v2.45.1
 
 	// ArgoCDDefaultDexRunAsUser is the numeric UID of the "dex" user declared in the Dex image.
 	// Kubernetes requires a numeric runAsUser when runAsNonRoot is true and the image USER is a named string.
